@@ -54,43 +54,46 @@ shunting_yard x = shunting_yard' x [] [] where
                 then shunting_yard' xs (tail s) (q ++ [head s])
                 else shunting_yard' remain (tail s) q
 
-data State = State Int deriving (Eq, Ord, Show)
+data NFAState = NFAState Int deriving (Eq, Ord, Show)
 
-shift_state :: Int->State->State
-shift_state index (State x) = State (x + index)
+shift_state :: Int->NFAState->NFAState
+shift_state index (NFAState x) = NFAState (x + index)
 
-data NFA = NFA { states :: [State]
-               , edges :: (State -> RECharType -> [State])
-               , start_state :: State
-               , end_state :: State
+data NFA = NFA { nfa_states :: [NFAState]
+               , charset :: Set.Set RECharType
+               , nfa_edges :: (NFAState -> RECharType -> [NFAState])
+               , nfa_start_state :: NFAState
+               , nfa_end_state :: NFAState
                }
 
 shift_NFA :: Int -> NFA -> NFA
 shift_NFA index nfa = 
-    NFA { states = states'
-        , edges = edges'
-        , start_state = start_state'
-        , end_state = end_state'
+    NFA { nfa_states = nfa_states'
+        , charset = charset nfa
+        , nfa_edges = nfa_edges'
+        , nfa_start_state = nfa_start_state'
+        , nfa_end_state = nfa_end_state'
         }
     where
-        start_state' = shift_state index $ start_state nfa
-        end_state' = shift_state index $ end_state nfa
-        states' = List.map (shift_state index) (states nfa)
-        edges' = \state c -> List.map (shift_state index) $ edges nfa (shift_state (negate index) state) c
+        nfa_start_state' = shift_state index $ nfa_start_state nfa
+        nfa_end_state' = shift_state index $ nfa_end_state nfa
+        nfa_states' = List.map (shift_state index) (nfa_states nfa)
+        nfa_edges' = \state c -> List.map (shift_state index) $ nfa_edges nfa (shift_state (negate index) state) c
 
 char_to_NFA :: RECharType -> NFA
 char_to_NFA c = case c of
-    CommonChar c -> NFA { states = [start_state', end_state']
-                        , edges = edges'
-                        , start_state = start_state'
-                        , end_state = end_state'
+    CommonChar c -> NFA { nfa_states = [nfa_start_state', nfa_end_state']
+                        , charset = Set.Singleton c
+                        , nfa_edges = nfa_edges'
+                        , nfa_start_state = nfa_start_state'
+                        , nfa_end_state = nfa_end_state'
                         }
                     where
-                        start_state' = State 0
-                        end_state' = State 1
-                        edges' state char =
-                            if state == start_state' && char == CommonChar c
-                                then [end_state']
+                        nfa_start_state' = NFAState 0
+                        nfa_end_state' = NFAState 1
+                        nfa_edges' state char =
+                            if state == nfa_start_state' && char == CommonChar c
+                                then [nfa_end_state']
                                 else []
     Epsilon -> error "Unexpcted error"
 
@@ -101,50 +104,52 @@ char_to_NFA c = case c of
 binary_operator_to_NFA :: REOperatorType -> NFA -> NFA -> NFA
 binary_operator_to_NFA operator lchild rchild = case operator of
     And ->
-        NFA { states = states'
-            , edges = edges'
-            , start_state = start_state'
-            , end_state = end_state'
+        NFA { nfa_states = nfa_states'
+            , charset = charset lchild `Set.union` (charset rchild)
+            , nfa_edges = nfa_edges'
+            , nfa_start_state = nfa_start_state'
+            , nfa_end_state = nfa_end_state'
             }
         where
-            start_state' = start_state lchild
-            State lend_index = end_state lchild
+            nfa_start_state' = nfa_start_state lchild
+            NFAState lend_index = nfa_end_state lchild
             rchild' = shift_NFA (lend_index + 1) rchild
-            end_state' = end_state rchild'
-            rchild_states' = states rchild'
-            states' = states lchild ++ rchild_states'
-            edges' = \(State index) c -> if index < lend_index
-                                            then edges lchild (State index) c
+            nfa_end_state' = nfa_end_state rchild'
+            rchild_nfa_states' = nfa_states rchild'
+            nfa_states' = nfa_states lchild ++ rchild_nfa_states'
+            nfa_edges' = \(NFAState index) c -> if index < lend_index
+                                            then nfa_edges lchild (NFAState index) c
                                             else 
                                                 if index == lend_index
-                                                    then start_state rchild' : (edges lchild (State index) c)
-                                                    else edges rchild' (State index) c
+                                                    then nfa_start_state rchild' : (nfa_edges lchild (NFAState index) c)
+                                                    else nfa_edges rchild' (NFAState index) c
     Or -> 
-        NFA { states = states'
-            , edges = edges'
-            , start_state = start_state'
-            , end_state = end_state'
+        NFA { nfa_states = nfa_states'
+            , charset = charset lchild `Set.union` (charset rchild)
+            , nfa_edges = nfa_edges'
+            , nfa_start_state = nfa_start_state'
+            , nfa_end_state = nfa_end_state'
             }
         where
-            start_state' = State 0
+            nfa_start_state' = NFAState 0
             lchild' = shift_NFA 1 lchild
-            State lend_index = end_state lchild'
+            NFAState lend_index = nfa_end_state lchild'
             rchild' = shift_NFA (lend_index + 1) rchild
-            State rend_index = end_state rchild'
-            end_state' = State (rend_index + 1)
-            states' = start_state' : (end_state' : ((states lchild') ++ (states rchild')))
-            edges' = \(State index) c -> 
+            NFAState rend_index = nfa_end_state rchild'
+            nfa_end_state' = NFAState (rend_index + 1)
+            nfa_states' = nfa_start_state' : (nfa_end_state' : ((nfa_states lchild') ++ (nfa_states rchild')))
+            nfa_edges' = \(NFAState index) c -> 
                 if index == 0
-                    then if c == Epsilon then [start_state lchild', start_state rchild'] else []
+                    then if c == Epsilon then [nfa_start_state lchild', nfa_start_state rchild'] else []
                     else 
                         if index < lend_index 
-                            then edges lchild' (State index) c
+                            then nfa_edges lchild' (NFAState index) c
                             else
                                 if index < rend_index
-                                    then edges rchild' (State index) c
+                                    then nfa_edges rchild' (NFAState index) c
                                     else
                                         if index == rend_index && c == Epsilon
-                                            then end_state' : (edges lchild' (State index) c) ++ (edges rchild' (State index) c)
+                                            then nfa_end_state' : (nfa_edges lchild' (NFAState index) c) ++ (nfa_edges rchild' (NFAState index) c)
                                             else []
     _ -> error "Unexpected error"
 
@@ -154,26 +159,27 @@ binary_operator_to_NFA operator lchild rchild = case operator of
 unary_operator_to_NFA :: REOperatorType -> NFA -> NFA
 unary_operator_to_NFA operator child = case operator of
     Repeat -> 
-        NFA { states = states'
-            , edges = edges'
-            , start_state = start_state'
-            , end_state = end_state'
+        NFA { nfa_states = nfa_states'
+            , charset = charset child
+            , nfa_edges = nfa_edges'
+            , nfa_start_state = nfa_start_state'
+            , nfa_end_state = nfa_end_state'
             }
         where
-            start_state' = State 0
+            nfa_start_state' = NFAState 0
             child' = shift_NFA 1 child
-            State end_index' = end_state child'
-            end_state' = State (end_index' + 1)
-            states' = start_state' : (end_state' : (states child'))
-            edges' = \(State index) c ->
+            NFAState end_index' = nfa_end_state child'
+            nfa_end_state' = NFAState (end_index' + 1)
+            nfa_states' = nfa_start_state' : (nfa_end_state' : (nfa_states child'))
+            nfa_edges' = \(NFAState index) c ->
                 if index == 0
-                    then if c == Epsilon then [start_state child'] else []
+                    then if c == Epsilon then [nfa_start_state child'] else []
                     else
                         if index < end_index'
-                            then edges child' (State index) c
+                            then nfa_edges child' (NFAState index) c
                             else 
                                 if index == end_index' && c == Epsilon
-                                    then end_state' : (start_state child' : (edges child' (State index) c))
+                                    then nfa_end_state' : (nfa_start_state child' : (nfa_edges child' (NFAState index) c))
                                     else []
     _ -> error "Unexpected error"
 
@@ -197,13 +203,86 @@ regular_tokens_to_NFA tokens = regular_tokens_to_NFA' tokens [] where
             _ -> error "Regular expression not valid!"
         _ -> error "Unexpected error"
 
+epsilon_closure_of_nfa_state :: NFA -> NFAState -> [NFAState]
+epsilon_closure_of_nfa_state nfa state = nfa_edges nfa state Epsilon
 
-charset :: [REToken] -> [REToken]
-charset [] = []
-charset (x:xs) = case x of
-    REChar c -> 
-        if elem (REChar c) remainCharset
-            then remainCharset
-            else (REChar c) : remainCharset
-        where remainCharset = charset xs
-    _ -> charset xs
+terminal_closure_of_nfa_state :: NFA -> RECharType -> NFAState -> [NFAState]
+terminal_closure_of_nfa_state nfa c state = nfa_edges nfa state c
+
+data DFAState = DFAState Int (Set.Set NFAState)
+
+instance Ord DFAState where
+    compare (DFAState _ nfa_states1) (DFAState _ nfa_states2) = compare nfa_states1 nfa_states2
+
+epsilon_closure_of_nfa_states :: NFA -> (Set.Set NFAState) -> (Set.Set NFAState)
+epsilon_closure_of_nfa_states nfa nfa_states = Set.foldl (\new_nfa_states nfa_state -> Set.union new_nfa_states (Set.fromList $ epsilon_closure_of_nfa_state nfa nfa_state)) Set.empty nfa_states
+
+terminal_closure_of_nfa_states :: NFA -> RECharType -> (Set.Set NFAState) -> (Set.Set NFAState)
+terminal_closure_of_nfa_states nfa c nfa_states = Set.foldl (\new_nfa_states nfa_state -> Set.union new_nfa_states (Set.fromList $ terminal_closure_of_nfa_state nfa c nfa_state)) Set.empty nfa_states
+
+data DFA = DFA { dfa_states :: Set.Set DFAState
+               , dfa_edges :: (DFAState -> RECharType -> (Set.Set DFAState))
+               , dfa_start_state :: DFAState
+               , dfa_end_states :: Set.Set DFAState
+               }
+
+single_dfa :: DFAState -> DFA
+single_dfa dfa_state = DFA { dfa_states = Set.singleton dfa_state
+                           , dfa_edges = (\_ _ -> [])
+                           , dfa_start_state = dfa_state
+                           , dfa_end_states = []
+                           }
+
+nfa_to_dfa :: NFA -> DFA
+nfa_to_dfa nfa = nfa_to_dfa' nfa  m single_dfa initial_dfa_state
+    where
+        initial_dfa_state = DFAState 0 $ epsilon_closure_of_nfa_state nfa $ start_state nfa
+        m = Set.singleton initial_dfa_state
+
+-- insert' dfa_state dfa_states
+-- if dfa_state is in dfa_states, just do nothing
+-- if dfa_state is not in dfa_states, assign the size of dfa_states to the index of dfa_state and insert it
+insert' :: DFAState -> (Set.Set DFAState) -> (Set.Set DFAState)
+insert' dfa_state@(DFAState _ nfa_states) dfa_states =
+    if Set.member dfa_state dfa_states
+        then dfa_states
+        else
+            Set.insert (DFAState (size dfa_states) nfa_states) dfa_states
+
+-- nfa_to_dfa' nfa processing dfa
+-- @param nfa the NFA to be converted from
+-- @param processing a set of DFAState to be processed
+-- @param dfa current DFA
+nfa_to_dfa' :: NFA -> [DFAState] -> DFA -> DFA
+nfa_to_dfa' nfa [] dfa = dfa
+nfa_to_dfa' nfa processing dfa = nfa_to_dfa' nfa processing' dfa'
+    where
+        dfa_state = head processing
+        processing' = tail processing
+        dfa' = nfa_to_dfa'' nfa (charset nfa) dfa_state dfa
+
+nfa_to_dfa'' :: NFA -> [RECharType] -> DFAState -> DFA -> DFA
+nfa_to_dfa'' nfa [] dfa_state dfa = dfa
+nfa_to_dfa'' nfa charset dfa_state dfa = nfa (tail charset) dfa_state dfa'
+        where
+            c = head charset
+            DFAState index nfa_states = dfa_state
+            encounted = dfa_states dfa
+            next_nfa_states = epsilon_closure_of_nfa_states . terminal_closure_of_nfa_states c nfa_states
+            next_dfa_state = DFAState (size encounted) next_nfa_states
+            (next_dfa_state', encounted') = case Set.lookupIndex next_nfa_state encounted of
+                                                Int index' -> (Set.elemAt index' encounted, encounted)
+                                                False -> (next_dfa_state, Set.insert next_dfa_state encounted)
+            dfa_edges' = (\the_state@(DFAState the_index _) the_c ->
+                            if the_index == index && the_c == c
+                                then Set.insert next_dfa_state' (dfa_edges dfa the_state c)
+                                else dfa_edges dfa the_state c
+                         )
+            dfa_end_states' = if List.length $ List.filter (\nfa_state -> nfa_end_state nfa == nfa_state) next_nfa_states
+                                then Set.insert next_Dfa_state $ dfa_end_states dfa
+                                else dfa_end_states dfa
+            dfa' = DFA { dfa_states = encounted'
+                       , dfa_edges = dfa_edges'
+                       , dfa_start_state = dfa_start_state dfa
+                       , dfa_end_states = dfa_end_states'
+                       }
