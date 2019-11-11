@@ -2,7 +2,7 @@ module NFA
 ( NFAState
 , NFA
 , nfa_states
-, charset
+, nfa_charset
 , nfa_edges
 , nfa_start_state
 , nfa_end_state
@@ -22,7 +22,7 @@ shift_state :: Int->NFAState->NFAState
 shift_state index (NFAState x) = NFAState (x + index)
 
 data NFA = NFA { nfa_states :: [NFAState]
-               , charset :: Set.Set RECharType
+               , nfa_charset :: Set.Set RECharType
                , nfa_edges :: (NFAState -> RECharType -> [NFAState])
                , nfa_start_state :: NFAState
                , nfa_end_state :: NFAState
@@ -31,7 +31,7 @@ data NFA = NFA { nfa_states :: [NFAState]
 shift_NFA :: Int -> NFA -> NFA
 shift_NFA index nfa = 
     NFA { nfa_states = nfa_states'
-        , charset = charset nfa
+        , nfa_charset = nfa_charset nfa
         , nfa_edges = nfa_edges'
         , nfa_start_state = nfa_start_state'
         , nfa_end_state = nfa_end_state'
@@ -45,7 +45,7 @@ shift_NFA index nfa =
 char_to_NFA :: RECharType -> NFA
 char_to_NFA c = case c of
     CommonChar c -> NFA { nfa_states = [nfa_start_state', nfa_end_state']
-                        , charset = Set.singleton $ CommonChar c
+                        , nfa_charset = Set.singleton $ CommonChar c
                         , nfa_edges = nfa_edges'
                         , nfa_start_state = nfa_start_state'
                         , nfa_end_state = nfa_end_state'
@@ -67,7 +67,7 @@ binary_operator_to_NFA :: REOperatorType -> NFA -> NFA -> NFA
 binary_operator_to_NFA operator lchild rchild = case operator of
     And ->
         NFA { nfa_states = nfa_states'
-            , charset = charset lchild `Set.union` (charset rchild)
+            , nfa_charset = nfa_charset lchild `Set.union` (nfa_charset rchild)
             , nfa_edges = nfa_edges'
             , nfa_start_state = nfa_start_state'
             , nfa_end_state = nfa_end_state'
@@ -87,7 +87,7 @@ binary_operator_to_NFA operator lchild rchild = case operator of
                                                     else nfa_edges rchild' (NFAState index) c
     Or -> 
         NFA { nfa_states = nfa_states'
-            , charset = charset lchild `Set.union` (charset rchild)
+            , nfa_charset = nfa_charset lchild `Set.union` (nfa_charset rchild)
             , nfa_edges = nfa_edges'
             , nfa_start_state = nfa_start_state'
             , nfa_end_state = nfa_end_state'
@@ -125,7 +125,7 @@ unary_operator_to_NFA :: REOperatorType -> NFA -> NFA
 unary_operator_to_NFA operator child = case operator of
     Repeat -> 
         NFA { nfa_states = nfa_states'
-            , charset = charset child
+            , nfa_charset = nfa_charset child
             , nfa_edges = nfa_edges'
             , nfa_start_state = nfa_start_state'
             , nfa_end_state = nfa_end_state'
