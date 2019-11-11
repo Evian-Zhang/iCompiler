@@ -1,9 +1,9 @@
 import qualified Data.Set as Set
 import qualified Data.List as List
 
-data REOperatorType = And | Or | Repeat deriving (Eq, Show)
-data RECharType = CommonChar Char | Epsilon deriving (Eq, Show)
-data REToken = REChar RECharType | REOperator REOperatorType | ParenOpen | ParenClose deriving (Eq, Show)
+data REOperatorType = And | Or | Repeat deriving (Eq, Show, Ord)
+data RECharType = CommonChar Char | Epsilon deriving (Eq, Show, Ord)
+data REToken = REChar RECharType | REOperator REOperatorType | ParenOpen | ParenClose deriving (Eq, Show, Ord)
 
 tokenize_regular_char :: Char -> REToken
 tokenize_regular_char operator = case operator of
@@ -83,7 +83,7 @@ shift_NFA index nfa =
 char_to_NFA :: RECharType -> NFA
 char_to_NFA c = case c of
     CommonChar c -> NFA { nfa_states = [nfa_start_state', nfa_end_state']
-                        , charset = Set.Singleton c
+                        , charset = Set.singleton $ CommonChar c
                         , nfa_edges = nfa_edges'
                         , nfa_start_state = nfa_start_state'
                         , nfa_end_state = nfa_end_state'
@@ -145,12 +145,15 @@ binary_operator_to_NFA operator lchild rchild = case operator of
                         if index < lend_index 
                             then nfa_edges lchild' (NFAState index) c
                             else
-                                if index < rend_index
-                                    then nfa_edges rchild' (NFAState index) c
+                                if index == lend_index && c == Epsilon
+                                    then nfa_end_state' : (nfa_edges lchild' (NFAState index) c)
                                     else
-                                        if index == rend_index && c == Epsilon
-                                            then nfa_end_state' : (nfa_edges lchild' (NFAState index) c) ++ (nfa_edges rchild' (NFAState index) c)
-                                            else []
+                                        if index < rend_index
+                                            then nfa_edges rchild' (NFAState index) c
+                                            else
+                                                if index == rend_index && c == Epsilon
+                                                    then nfa_end_state' : (nfa_edges rchild' (NFAState index) c)
+                                                    else []
     _ -> error "Unexpected error"
 
 -- unary_operator_to_NFA operator child
@@ -172,8 +175,8 @@ unary_operator_to_NFA operator child = case operator of
             nfa_end_state' = NFAState (end_index' + 1)
             nfa_states' = nfa_start_state' : (nfa_end_state' : (nfa_states child'))
             nfa_edges' = \(NFAState index) c ->
-                if index == 0
-                    then if c == Epsilon then [nfa_start_state child'] else []
+                if index == 0 && c == Epsilon
+                    then [nfa_start_state child', nfa_end_state']
                     else
                         if index < end_index'
                             then nfa_edges child' (NFAState index) c
@@ -203,51 +206,51 @@ regular_tokens_to_NFA tokens = regular_tokens_to_NFA' tokens [] where
             _ -> error "Regular expression not valid!"
         _ -> error "Unexpected error"
 
-epsilon_closure_of_nfa_state :: NFA -> NFAState -> [NFAState]
-epsilon_closure_of_nfa_state nfa state = nfa_edges nfa state Epsilon
+epsilon_closure_of_nfa_states :: NFA -> [NFAState] -> (Set.Set NFAState)
+epsilon_closure_of_nfa_states nfa nfa_states = epsilon_closure_of_nfa_states' nfa nfa_states Set.empty
 
-terminal_closure_of_nfa_state :: NFA -> RECharType -> NFAState -> [NFAState]
-terminal_closure_of_nfa_state nfa c state = nfa_edges nfa state c
+epsilon_closure_of_nfa_states' :: NFA -> [NFAState] -> (Set.Set NFAState) -> (Set.Set NFAState)
+epsilon_closure_of_nfa_states' _ [] output = output
+epsilon_closure_of_nfa_states' nfa nfa_states output = epsilon_closure_of_nfa_states' nfa nfa_states'' output'
+            where
+                nfa_state = head nfa_states
+                nfa_states' = tail nfa_states
+                output' = output `Set.union` (Set.fromList $ nfa_state : (nfa_edges nfa nfa_state Epsilon))
+                new_states = output' Set.\\ output
+                new_states' = Set.toList new_states
+                nfa_states'' = nfa_states' ++ new_states'
 
-data DFAState = DFAState Int (Set.Set NFAState)
+terminal_closure_of_nfa_state :: NFA -> RECharType -> NFAState -> (Set.Set NFAState)
+terminal_closure_of_nfa_state nfa c state = Set.fromList $ nfa_edges nfa state c
+
+terminal_closure_of_nfa_states :: NFA -> RECharType -> (Set.Set NFAState) -> (Set.Set NFAState)
+terminal_closure_of_nfa_states nfa c nfa_states = Set.foldl (\new_nfa_states nfa_state -> Set.union new_nfa_states $ terminal_closure_of_nfa_state nfa c nfa_state) Set.empty nfa_states
+
+data DFAState = DFAState Int (Set.Set NFAState) deriving (Show)
+
+instance Eq DFAState where
+    (==) (DFAState _ nfa_states1) (DFAState _ nfa_states2) = nfa_states1 == nfa_states2
 
 instance Ord DFAState where
     compare (DFAState _ nfa_states1) (DFAState _ nfa_states2) = compare nfa_states1 nfa_states2
 
-epsilon_closure_of_nfa_states :: NFA -> (Set.Set NFAState) -> (Set.Set NFAState)
-epsilon_closure_of_nfa_states nfa nfa_states = Set.foldl (\new_nfa_states nfa_state -> Set.union new_nfa_states (Set.fromList $ epsilon_closure_of_nfa_state nfa nfa_state)) Set.empty nfa_states
-
-terminal_closure_of_nfa_states :: NFA -> RECharType -> (Set.Set NFAState) -> (Set.Set NFAState)
-terminal_closure_of_nfa_states nfa c nfa_states = Set.foldl (\new_nfa_states nfa_state -> Set.union new_nfa_states (Set.fromList $ terminal_closure_of_nfa_state nfa c nfa_state)) Set.empty nfa_states
-
 data DFA = DFA { dfa_states :: Set.Set DFAState
-               , dfa_edges :: (DFAState -> RECharType -> (Set.Set DFAState))
+               , dfa_edges :: (DFAState -> RECharType -> Maybe DFAState)
                , dfa_start_state :: DFAState
                , dfa_end_states :: Set.Set DFAState
                }
 
 single_dfa :: DFAState -> DFA
 single_dfa dfa_state = DFA { dfa_states = Set.singleton dfa_state
-                           , dfa_edges = (\_ _ -> [])
+                           , dfa_edges = (\_ _ -> Nothing)
                            , dfa_start_state = dfa_state
-                           , dfa_end_states = []
+                           , dfa_end_states = Set.empty
                            }
 
 nfa_to_dfa :: NFA -> DFA
-nfa_to_dfa nfa = nfa_to_dfa' nfa  m single_dfa initial_dfa_state
+nfa_to_dfa nfa = nfa_to_dfa' nfa [initial_dfa_state] $ single_dfa initial_dfa_state
     where
-        initial_dfa_state = DFAState 0 $ epsilon_closure_of_nfa_state nfa $ start_state nfa
-        m = Set.singleton initial_dfa_state
-
--- insert' dfa_state dfa_states
--- if dfa_state is in dfa_states, just do nothing
--- if dfa_state is not in dfa_states, assign the size of dfa_states to the index of dfa_state and insert it
-insert' :: DFAState -> (Set.Set DFAState) -> (Set.Set DFAState)
-insert' dfa_state@(DFAState _ nfa_states) dfa_states =
-    if Set.member dfa_state dfa_states
-        then dfa_states
-        else
-            Set.insert (DFAState (size dfa_states) nfa_states) dfa_states
+        initial_dfa_state = DFAState 0 $ epsilon_closure_of_nfa_states nfa [nfa_start_state nfa]
 
 -- nfa_to_dfa' nfa processing dfa
 -- @param nfa the NFA to be converted from
@@ -258,31 +261,41 @@ nfa_to_dfa' nfa [] dfa = dfa
 nfa_to_dfa' nfa processing dfa = nfa_to_dfa' nfa processing' dfa'
     where
         dfa_state = head processing
-        processing' = tail processing
-        dfa' = nfa_to_dfa'' nfa (charset nfa) dfa_state dfa
+        dfa' = nfa_to_dfa'' nfa (Set.toList (charset nfa)) dfa_state dfa
+        new_dfa_states = Set.toList (dfa_states dfa' Set.\\ (dfa_states dfa))
+        new_dfa_states' = List.sortOn (\(DFAState index _) -> index) new_dfa_states
+        processing' = tail processing ++ new_dfa_states'
 
 nfa_to_dfa'' :: NFA -> [RECharType] -> DFAState -> DFA -> DFA
 nfa_to_dfa'' nfa [] dfa_state dfa = dfa
-nfa_to_dfa'' nfa charset dfa_state dfa = nfa (tail charset) dfa_state dfa'
+nfa_to_dfa'' nfa charset dfa_state dfa = nfa_to_dfa'' nfa (tail charset) dfa_state dfa'
         where
             c = head charset
             DFAState index nfa_states = dfa_state
             encounted = dfa_states dfa
-            next_nfa_states = epsilon_closure_of_nfa_states . terminal_closure_of_nfa_states c nfa_states
-            next_dfa_state = DFAState (size encounted) next_nfa_states
-            (next_dfa_state', encounted') = case Set.lookupIndex next_nfa_state encounted of
-                                                Int index' -> (Set.elemAt index' encounted, encounted)
-                                                False -> (next_dfa_state, Set.insert next_dfa_state encounted)
-            dfa_edges' = (\the_state@(DFAState the_index _) the_c ->
-                            if the_index == index && the_c == c
-                                then Set.insert next_dfa_state' (dfa_edges dfa the_state c)
-                                else dfa_edges dfa the_state c
-                         )
-            dfa_end_states' = if List.length $ List.filter (\nfa_state -> nfa_end_state nfa == nfa_state) next_nfa_states
-                                then Set.insert next_Dfa_state $ dfa_end_states dfa
+            next_nfa_states = epsilon_closure_of_nfa_states nfa $ Set.toList $ terminal_closure_of_nfa_states nfa c nfa_states
+            next_dfa_state = DFAState (Set.size encounted) next_nfa_states
+            (next_dfa_state', encounted') = case Set.lookupIndex next_dfa_state encounted of
+                                                Just index' -> (Set.elemAt index' encounted, encounted)
+                                                Nothing -> (next_dfa_state, Set.insert next_dfa_state encounted)
+            dfa_edges' = if not (Set.null next_nfa_states)
+                            then
+                                (\the_state@(DFAState the_index _) the_c ->
+                                    if the_index == index && the_c == c
+                                        then Just next_dfa_state'
+                                        else dfa_edges dfa the_state c
+                                )
+                            else
+                                dfa_edges dfa
+            dfa_end_states' = if not $ List.null $ List.filter (\nfa_state -> nfa_end_state nfa == nfa_state) $ Set.toList next_nfa_states
+                                then Set.insert next_dfa_state $ dfa_end_states dfa
                                 else dfa_end_states dfa
-            dfa' = DFA { dfa_states = encounted'
-                       , dfa_edges = dfa_edges'
-                       , dfa_start_state = dfa_start_state dfa
-                       , dfa_end_states = dfa_end_states'
-                       }
+            dfa' = if not (Set.null next_nfa_states)
+                    then
+                        DFA { dfa_states = encounted'
+                        , dfa_edges = dfa_edges'
+                        , dfa_start_state = dfa_start_state dfa
+                        , dfa_end_states = dfa_end_states'
+                        }
+                    else
+                        dfa
