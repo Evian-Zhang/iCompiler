@@ -10,8 +10,13 @@ import qualified Data.Set as Set
 import qualified Data.List as List
 
 data REOperatorType = And | Or | Repeat deriving (Eq, Show, Ord)
-data RECharType = CommonChar Char | Epsilon deriving (Eq, Show, Ord)
+data RECharType = CommonChar Char | Epsilon deriving (Eq, Ord)
 data REToken = REChar RECharType | REOperator REOperatorType | ParenOpen | ParenClose deriving (Eq, Show, Ord)
+
+instance Show RECharType where
+    show c = case c of
+                CommonChar common_char -> show common_char
+                Epsilon -> "ε"
 
 tokenize_regular_char :: Char -> REToken
 tokenize_regular_char operator = case operator of

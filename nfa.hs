@@ -14,7 +14,10 @@ import qualified Data.List as List
 
 import Re
 
-data NFAState = NFAState Int deriving (Eq, Ord, Show)
+data NFAState = NFAState Int deriving (Eq, Ord)
+
+instance Show NFAState where
+    show (NFAState index) = show index
 
 shift_state :: Int->NFAState->NFAState
 shift_state index (NFAState x) = NFAState (x + index)
@@ -25,6 +28,30 @@ data NFA = NFA { nfa_states :: [NFAState]
                , nfa_start_state :: NFAState
                , nfa_end_state :: NFAState
                }
+
+instance Show NFA where
+    show nfa = states_str ++ "\n" ++ start_state_str ++ "\n" ++ end_state_str ++ "\n" ++ edges_str
+        where
+            states_str = "States: " ++ (show $ nfa_states nfa)
+            start_state_str = "Start state: " ++ (show $ nfa_start_state nfa)
+            end_state_str = "End state: " ++ (show $ nfa_end_state nfa)
+            nfa_states' = List.sortOn (\(NFAState index) -> index) $ nfa_states nfa
+            nfa_charset' = Set.toList $ nfa_charset nfa
+            edges_str = show_state_edges nfa_states' nfa_charset' (nfa_edges nfa)
+                where
+                    show_state_edges nfa_states nfa_charset nfa_edges = if List.null nfa_states
+                        then ""
+                        else "\n" ++ (show_state_char_edges (head nfa_states') nfa_charset nfa_edges) ++ (show_state_edges (tail nfa_states) nfa_charset nfa_edges)
+                            where
+                                show_state_char_edges _ [] _ = ""
+                                show_state_char_edges nfa_state charset nfa_edges = (case next_state of
+                                    [] -> "" 
+                                    xs -> show_state_char_edge nfa_state (head charset) xs ++ "\n") ++ show_state_char_edges nfa_state (tail charset) nfa_edges
+                                    where
+                                        next_state = nfa_edges nfa_state $ head charset
+                                        show_state_char_edge _ _ [] = ""
+                                        show_state_char_edge nfa_state char next_state = show nfa_state ++ " -" ++ (show $ char) ++ "-> " ++ (show next_state) ++ "\n" ++ show_state_char_edge nfa_state char (tail next_state)
+
 
 shift_NFA :: Int -> NFA -> NFA
 shift_NFA index nfa = 
