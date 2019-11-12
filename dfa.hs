@@ -39,7 +39,10 @@ terminal_closure_of_nfa_state nfa c state = Set.fromList $ nfa_edges nfa state c
 terminal_closure_of_nfa_states :: NFA -> RECharType -> (Set.Set NFAState) -> (Set.Set NFAState)
 terminal_closure_of_nfa_states nfa c nfa_states = Set.foldl (\new_nfa_states nfa_state -> Set.union new_nfa_states $ terminal_closure_of_nfa_state nfa c nfa_state) Set.empty nfa_states
 
-data DFAState = DFAState Int (Set.Set NFAState) deriving (Show)
+data DFAState = DFAState Int (Set.Set NFAState)
+
+instance Show DFAState where
+    show (DFAState index _) = show index
 
 -- Two DFA states are equal iff their sets of nfa_states are equal
 instance Eq DFAState where
@@ -54,6 +57,28 @@ data DFA = DFA { dfa_states :: Set.Set DFAState
                , dfa_start_state :: DFAState
                , dfa_end_states :: Set.Set DFAState
                }
+
+instance Show DFA where
+    show dfa = states_str ++ "\n" ++ start_state_str ++ "\n" ++ end_states_str ++ "\n" ++ edges_str
+        where
+            dfa_states' = List.sortOn (\(DFAState index _) -> index) $ Set.toList $ dfa_states dfa
+            states_str = "States:\n" ++ (show_states dfa_states')
+            start_state_str = "Start state: " ++ (show $ dfa_start_state dfa)
+            end_states_str = "End states: " ++ (show $ List.sortOn (\(DFAState index _) -> index) $ Set.toList $ dfa_end_states dfa)
+            dfa_charset' = Set.toList $ dfa_charset dfa
+            show_states [] = ""
+            show_states ((DFAState index nfa_states):remain) = "DFAState " ++ (show index) ++ ":\n" ++ (show $ Set.toList nfa_states) ++ "\n" ++ (show_states remain)
+            edges_str = show_state_edges dfa_states' dfa_charset' (dfa_edges dfa)
+                where
+                    show_state_edges dfa_states dfa_charset dfa_edges = if List.null dfa_states
+                        then ""
+                        else "\n" ++ (show_state_char_edges (head dfa_states') dfa_charset dfa_edges) ++ (show_state_edges (tail dfa_states) dfa_charset dfa_edges)
+                            where
+                                show_state_char_edges _ [] _ = ""
+                                show_state_char_edges dfa_state charset dfa_edges = case dfa_edges dfa_state (head charset) of
+                                    Nothing -> ""
+                                    Just next_state -> show dfa_state ++ " -" ++ (show $ head charset) ++ "-> " ++ (show next_state) ++ "\n" ++ show_state_char_edges dfa_state (tail charset) dfa_edges
+
 
 -- constructor of DFA with a single DFAState and a given charset
 single_dfa :: DFAState -> (Set.Set RECharType) -> DFA

@@ -11,6 +11,8 @@ main = do
         dfa = nfa_to_dfa nfa
         dfao = dfa_to_dfao dfa
     putStrLn "---------NFA---------"
-
+    print nfa
     putStrLn "---------DFA---------"
+    print dfa
     putStrLn "----minimized DFA----"
+    print dfao

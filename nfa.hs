@@ -36,7 +36,7 @@ instance Show NFA where
             start_state_str = "Start state: " ++ (show $ nfa_start_state nfa)
             end_state_str = "End state: " ++ (show $ nfa_end_state nfa)
             nfa_states' = List.sortOn (\(NFAState index) -> index) $ nfa_states nfa
-            nfa_charset' = Set.toList $ nfa_charset nfa
+            nfa_charset' = Epsilon : (Set.toList $ nfa_charset nfa)
             edges_str = show_state_edges nfa_states' nfa_charset' (nfa_edges nfa)
                 where
                     show_state_edges nfa_states nfa_charset nfa_edges = if List.null nfa_states
@@ -50,7 +50,7 @@ instance Show NFA where
                                     where
                                         next_state = nfa_edges nfa_state $ head charset
                                         show_state_char_edge _ _ [] = ""
-                                        show_state_char_edge nfa_state char next_state = show nfa_state ++ " -" ++ (show $ char) ++ "-> " ++ (show next_state) ++ "\n" ++ show_state_char_edge nfa_state char (tail next_state)
+                                        show_state_char_edge nfa_state char next_state = show nfa_state ++ " -" ++ (show char) ++ "-> " ++ (show next_state) ++ "\n" ++ show_state_char_edge nfa_state char (tail next_state)
 
 
 shift_NFA :: Int -> NFA -> NFA

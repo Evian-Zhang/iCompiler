@@ -127,7 +127,10 @@ reduce_dfa_states dfa (dfa_states:sets) = reduce_dfa_states dfa' sets
     where
         dfa' = merge_dfa_states dfa (Set.toList dfa_states)
 
-data DFAOState = DFAOState Int deriving (Eq, Ord, Show)
+data DFAOState = DFAOState Int deriving (Eq, Ord)
+
+instance Show DFAOState where
+    show (DFAOState index) = show index
 
 data DFAO = DFAO { dfao_states :: Set.Set DFAOState
                  , dfao_charset :: Set.Set RECharType
@@ -135,6 +138,25 @@ data DFAO = DFAO { dfao_states :: Set.Set DFAOState
                  , dfao_start_state :: DFAOState
                  , dfao_end_states :: Set.Set DFAOState
                  }
+
+instance Show DFAO where
+    show dfao = states_str ++ "\n" ++ start_state_str ++ "\n" ++ end_states_str ++ "\n" ++ edges_str
+        where
+            dfao_states' = Set.toList $  dfao_states dfao
+            states_str = "States:\n" ++ (show dfao_states')
+            start_state_str = "Start state: " ++ (show $ dfao_start_state dfao)
+            end_states_str = "End states: " ++ (show $ Set.toList $ dfao_end_states dfao)
+            dfao_charset' = Set.toList $ dfao_charset dfao
+            edges_str = show_state_edges dfao_states' dfao_charset' (dfao_edges dfao)
+                where
+                    show_state_edges dfao_states dfao_charset dfao_edges = if List.null dfao_states
+                        then ""
+                        else "\n" ++ (show_state_char_edges (head dfao_states') dfao_charset dfao_edges) ++ (show_state_edges (tail dfao_states) dfao_charset dfao_edges)
+                            where
+                                show_state_char_edges _ [] _ = ""
+                                show_state_char_edges dfao_state charset dfao_edges = case dfao_edges dfao_state (head charset) of
+                                    Nothing -> ""
+                                    Just next_state -> show dfao_state ++ " -" ++ (show $ head charset) ++ "-> " ++ (show next_state) ++ "\n" ++ show_state_char_edges dfao_state (tail charset) dfao_edges
 
 -- @brief renumber the states in DFA
 -- @discuss for example, the reduced dfa has states: 0, 2, 4, 5. Then, renumber it to 0, 1, 2, 3
