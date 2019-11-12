@@ -15,6 +15,7 @@ import qualified Data.List as List
 import Re
 import DFA
 
+-- find the DFA state with smallest index in a given set
 find_smallest_index :: [DFAState] -> DFAState
 find_smallest_index [dfa_state] = dfa_state
 find_smallest_index dfa_states = if index < min_index then dfa_state else min_state
@@ -22,6 +23,7 @@ find_smallest_index dfa_states = if index < min_index then dfa_state else min_st
         dfa_state@(DFAState index _) = head dfa_states
         min_state@(DFAState min_index _) = find_smallest_index $ tail dfa_states
 
+-- merge the set of DFA state into one dfa state which has the smallest index in the set
 merge_dfa_states :: DFA -> [DFAState] -> DFA
 merge_dfa_states dfa dfa_states = merge_dfa_states' dfa dfa_state dfa_states
         where
@@ -31,6 +33,11 @@ merge_dfa_states dfa dfa_states = merge_dfa_states' dfa dfa_state dfa_states
             merge_dfa_states' dfa _ [] = dfa
             merge_dfa_states' dfa dfa_state dfa_states = merge_dfa_states' dfa' dfa_state $ tail dfa_states
 
+-- merge_dfa_state dfa dfa_state to_merge
+-- @brief merge a DFA state into another DFA state
+-- @param DFA           the DFA to be updated
+-- @param dfa_state     the DFA state to be merged to
+-- @param to_merge      the DFA state to be merged
 merge_dfa_state :: DFA -> DFAState -> DFAState -> DFA
 merge_dfa_state dfa dfa_state to_merge = dfa'
     where
@@ -54,28 +61,50 @@ merge_dfa_state dfa dfa_state to_merge = dfa'
                         , dfa_end_states = dfa_end_states'
                         }
 
+-- split_dfa dfa
+-- @brief split a given DFA into two sets of DFA states, corresponding to whether it is an accpeting state
+-- @param dfa                   the DFA to be split
+-- @return (non_accpetings, acceptings)
+--          non_accpetings:     the set of DFA states which is not an accpeting state
+--          acceptings:         the set of DFA states which is an accepting state
 split_dfa :: DFA -> ([DFAState], [DFAState])
 split_dfa dfa = Set.foldl (\(non_acceptings, acceptings) dfa_state ->
                             if Set.member dfa_state $ dfa_end_states dfa
                                 then (non_acceptings, dfa_state : acceptings)
                                 else (dfa_state : non_acceptings, acceptings)) ([], []) (dfa_states dfa)
 
+-- hopcroft dfa p w
+-- @brief Hopcroft algorthim to minimize DFA
+-- @brief p     current set of equivelent classes
+-- @brief w     set of remaining groups that haven't been divided
 hopcroft :: DFA -> Set.Set (Set.Set DFAState) -> Set.Set (Set.Set DFAState) -> Set.Set (Set.Set DFAState)
 hopcroft dfa p w = if null w then p else hopcroft dfa p' w'
     where
         a = Set.elemAt 0 w
         (w', p') = hopcroft_for_c dfa (Set.toList $ dfa_charset dfa) a (Set.deleteAt 0 w, p)
 
+-- hopcroft_for_c dfa cs a (w, p)
+-- @brief auxiliary function for hopcroft. Used to travese charset
+-- @param dfa       current DFA
+-- @param cs        remaining charset
+-- @param a         current set of DFA states that is being processed
+-- @param (w, p)    current (w, p)
 hopcroft_for_c :: DFA -> [RECharType] -> (Set.Set DFAState) -> (Set.Set (Set.Set DFAState), Set.Set (Set.Set DFAState)) -> (Set.Set (Set.Set DFAState), Set.Set (Set.Set DFAState))
 hopcroft_for_c dfa [] _ (w, p) = (w, p)
 hopcroft_for_c dfa (c:cs) a (w, p) = hopcroft_for_c dfa cs a (w', p')
     where
         x = Set.filter (\dfa_state -> case dfa_edges dfa dfa_state c of
-            Just x -> Set.member x a
-            Nothing -> False) $ dfa_states dfa
-        ys = Set.filter (\dfa_states -> (not $ null $ Set.intersection x dfa_states) && (not $ null $ dfa_states Set.\\ x)) p
+                                        Just x -> Set.member x a
+                                        Nothing -> False) $ dfa_states dfa
+        ys = Set.filter (\dfa_states -> (not $ Set.null $ Set.intersection x dfa_states) && (not $ Set.null $ dfa_states Set.\\ x)) p
         (w', p') = hopcroft_for_y dfa x ys (w, p)
 
+-- hopcroft_for_y dfa x ys (w, p)
+-- @brief auxiliary function for hopcroft. Used to traverse equivalent classes
+-- @param dfa       current DFA
+-- @param x         a set of DFA states used in the algorithm
+-- @param ys        a set of equivalent classes used in the algorithm
+-- @param (w, p)    current (w, p)
 hopcroft_for_y :: DFA -> Set.Set DFAState -> Set.Set (Set.Set DFAState) -> (Set.Set (Set.Set DFAState), Set.Set (Set.Set DFAState)) -> (Set.Set (Set.Set DFAState), Set.Set (Set.Set DFAState))
 hopcroft_for_y dfa x ys (w, p) = if null ys then (w, p) else hopcroft_for_y dfa x ys' (w', p')
     where
@@ -91,6 +120,7 @@ hopcroft_for_y dfa x ys (w, p) = if null ys then (w, p) else hopcroft_for_y dfa 
                         then Set.insert xny $ Set.delete y w
                         else Set.insert yx $ Set.delete y w
 
+-- reduce states in DFA according to the equivalent class
 reduce_dfa_states :: DFA -> [Set.Set DFAState] -> DFA
 reduce_dfa_states dfa [] = dfa
 reduce_dfa_states dfa (dfa_states:sets) = reduce_dfa_states dfa' sets
@@ -106,6 +136,11 @@ data DFAO = DFAO { dfao_states :: Set.Set DFAOState
                  , dfao_end_states :: Set.Set DFAOState
                  }
 
+-- @brief renumber the states in DFA
+-- @discuss for example, the reduced dfa has states: 0, 2, 4, 5. Then, renumber it to 0, 1, 2, 3
+-- @return (index_map, reverse_index_map)
+--          index_map           from initial state index to renumbered index
+--          reverse_index_map   from renumbered index to initial state index
 get_index_map :: (Set.Set DFAState) -> (Int -> Maybe Int, Int -> Maybe Int)
 get_index_map dfa_states = get_index_map' dfa_states' indices
     where
@@ -120,6 +155,7 @@ get_index_map dfa_states = get_index_map' dfa_states' indices
                     then Just state_index
                     else snd (get_index_map' remain_states remain_indices) x))
 
+-- from DFA to optimized DFA
 dfa_to_dfao :: DFA -> DFAO
 dfa_to_dfao dfa = DFAO { dfao_states = dfao_states'
                        , dfao_charset = dfa_charset dfa
