@@ -1,0 +1,151 @@
+module DFAO
+( DFAOState (DFAOState)
+, DFAO (DFAO)
+, dfao_states
+, dfao_start_state
+, dfao_charset
+, dfao_end_states
+, dfao_edges
+, dfa_to_dfao
+) where
+
+import qualified Data.Set as Set
+import qualified Data.List as List
+
+import Re
+import DFA
+
+find_smallest_index :: [DFAState] -> DFAState
+find_smallest_index [dfa_state] = dfa_state
+find_smallest_index dfa_states = if index < min_index then dfa_state else min_state
+    where
+        dfa_state@(DFAState index _) = head dfa_states
+        min_state@(DFAState min_index _) = find_smallest_index $ tail dfa_states
+
+merge_dfa_states :: DFA -> [DFAState] -> DFA
+merge_dfa_states dfa dfa_states = merge_dfa_states' dfa dfa_state dfa_states
+        where
+            dfa_state = find_smallest_index dfa_states
+            to_merge = head dfa_states
+            dfa' = merge_dfa_state dfa dfa_state to_merge
+            merge_dfa_states' dfa _ [] = dfa
+            merge_dfa_states' dfa dfa_state dfa_states = merge_dfa_states' dfa' dfa_state $ tail dfa_states
+
+merge_dfa_state :: DFA -> DFAState -> DFAState -> DFA
+merge_dfa_state dfa dfa_state to_merge = dfa'
+    where
+        DFAState merged_index _ = dfa_state
+        DFAState to_merge_index _ = to_merge
+        dfa_states' = Set.delete to_merge $ dfa_states dfa
+        dfa_end_states' = Set.delete to_merge $ dfa_end_states dfa
+        dfa_edges' = \the_state@(DFAState index _) c -> 
+            if index == to_merge_index
+                then Nothing
+                else case dfa_edges dfa the_state c of
+                    Just out_state@(DFAState out_index _) -> if out_index == to_merge_index then Just dfa_state else Just out_state
+                    Nothing -> Nothing
+        dfa' = if dfa_state == to_merge
+                then dfa
+                else
+                    DFA { dfa_states = dfa_states'
+                        , dfa_charset = dfa_charset dfa
+                        , dfa_edges = dfa_edges'
+                        , dfa_start_state = dfa_start_state dfa
+                        , dfa_end_states = dfa_end_states'
+                        }
+
+split_dfa :: DFA -> ([DFAState], [DFAState])
+split_dfa dfa = Set.foldl (\(non_acceptings, acceptings) dfa_state ->
+                            if Set.member dfa_state $ dfa_end_states dfa
+                                then (non_acceptings, dfa_state : acceptings)
+                                else (dfa_state : non_acceptings, acceptings)) ([], []) (dfa_states dfa)
+
+hopcroft :: DFA -> Set.Set (Set.Set DFAState) -> Set.Set (Set.Set DFAState) -> Set.Set (Set.Set DFAState)
+hopcroft dfa p w = if null w then p else hopcroft dfa p' w'
+    where
+        a = Set.elemAt 0 w
+        (w', p') = hopcroft_for_c dfa (Set.toList $ dfa_charset dfa) a (Set.deleteAt 0 w, p)
+
+hopcroft_for_c :: DFA -> [RECharType] -> (Set.Set DFAState) -> (Set.Set (Set.Set DFAState), Set.Set (Set.Set DFAState)) -> (Set.Set (Set.Set DFAState), Set.Set (Set.Set DFAState))
+hopcroft_for_c dfa [] _ (w, p) = (w, p)
+hopcroft_for_c dfa (c:cs) a (w, p) = hopcroft_for_c dfa cs a (w', p')
+    where
+        x = Set.filter (\dfa_state -> case dfa_edges dfa dfa_state c of
+            Just x -> Set.member x a
+            Nothing -> False) $ dfa_states dfa
+        ys = Set.filter (\dfa_states -> (not $ null $ Set.intersection x dfa_states) && (not $ null $ dfa_states Set.\\ x)) p
+        (w', p') = hopcroft_for_y dfa x ys (w, p)
+
+hopcroft_for_y :: DFA -> Set.Set DFAState -> Set.Set (Set.Set DFAState) -> (Set.Set (Set.Set DFAState), Set.Set (Set.Set DFAState)) -> (Set.Set (Set.Set DFAState), Set.Set (Set.Set DFAState))
+hopcroft_for_y dfa x ys (w, p) = if null ys then (w, p) else hopcroft_for_y dfa x ys' (w', p')
+    where
+        y = Set.elemAt 0 ys
+        ys' = Set.deleteAt 0 ys
+        xny = Set.intersection x y
+        yx = y Set.\\ x
+        p' = Set.insert yx $ Set.insert xny $ Set.delete y p
+        w' = if Set.member y w
+                then Set.insert yx $ Set.insert xny $ Set.delete y w
+                else
+                    if Set.size xny < Set.size yx
+                        then Set.insert xny $ Set.delete y w
+                        else Set.insert yx $ Set.delete y w
+
+reduce_dfa_states :: DFA -> [Set.Set DFAState] -> DFA
+reduce_dfa_states dfa [] = dfa
+reduce_dfa_states dfa (dfa_states:sets) = reduce_dfa_states dfa' sets
+    where
+        dfa' = merge_dfa_states dfa (Set.toList dfa_states)
+
+data DFAOState = DFAOState Int deriving (Eq, Ord, Show)
+
+data DFAO = DFAO { dfao_states :: Set.Set DFAOState
+                 , dfao_charset :: Set.Set RECharType
+                 , dfao_edges :: (DFAOState -> RECharType -> (Maybe DFAOState))
+                 , dfao_start_state :: DFAOState
+                 , dfao_end_states :: Set.Set DFAOState
+                 }
+
+get_index_map :: (Set.Set DFAState) -> (Int -> Maybe Int, Int -> Maybe Int)
+get_index_map dfa_states = get_index_map' dfa_states' indices
+    where
+        dfa_states' = List.sortOn (\(DFAState index _) -> index) $ Set.toList dfa_states
+        indices = [0, 1 ..]
+        get_index_map' [] _ = ((\_ -> Nothing), (\_ -> Nothing))
+        get_index_map' ((DFAState state_index _):remain_states) (index:remain_indices) =
+            ((\x -> if x == state_index
+                        then Just index
+                        else fst (get_index_map' remain_states remain_indices) x),
+            (\x -> if x == index
+                    then Just state_index
+                    else snd (get_index_map' remain_states remain_indices) x))
+
+dfa_to_dfao :: DFA -> DFAO
+dfa_to_dfao dfa = DFAO { dfao_states = dfao_states'
+                       , dfao_charset = dfa_charset dfa
+                       , dfao_edges = dfao_edges'
+                       , dfao_start_state = dfao_start_state'
+                       , dfao_end_states = dfao_end_states'
+                       }
+    where
+        (index_map, reverse_index_map) = get_index_map $ dfa_states dfa
+        dfao_states' = Set.map (\(DFAState index _) -> case index_map index of
+                                    Just a -> DFAOState a
+                                    Nothing -> error "Unexpected error") $ dfa_states dfa
+        dfao_edges' = (\(DFAOState index) c -> 
+            case reverse_index_map index of
+                Just a -> case dfa_edges dfa (DFAState a Set.empty) c of
+                            Just (DFAState x _) -> case index_map x of 
+                                        Just y -> Just (DFAOState y)
+                                        Nothing -> error "Unexpected error"
+                            Nothing -> error "Unexpected error"
+                Nothing -> Nothing
+            )
+        DFAState start_index _ = dfa_start_state dfa
+        dfao_start_state' = DFAOState (case index_map start_index of
+                                        Just x -> x
+                                        Nothing -> error "Unexpected error")
+        dfao_end_states' = Set.map (\(DFAState index _) -> 
+            DFAOState (case index_map index of
+                        Just x -> x
+                        Nothing -> error "Unexpected error")) $ dfa_end_states dfa

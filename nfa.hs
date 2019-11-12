@@ -1,14 +1,12 @@
 module NFA
-( NFAState
-, NFA
+( NFAState (NFAState)
+, NFA (NFA)
 , nfa_states
 , nfa_charset
 , nfa_edges
 , nfa_start_state
 , nfa_end_state
 , regular_tokens_to_NFA
-, epsilon_closure_of_nfa_states
-, terminal_closure_of_nfa_states
 ) where
 
 import qualified Data.Set as Set
@@ -60,9 +58,9 @@ char_to_NFA c = case c of
     Epsilon -> error "Unexpcted error"
 
 -- binary_operator_to_NFA operator lchild rchild
--- @param operator binary operator
--- @param lchild left operand of operator
--- @param rchild right operand of opeartor
+-- @param operator  binary operator
+-- @param lchild    left operand of operator
+-- @param rchild    right operand of opeartor
 binary_operator_to_NFA :: REOperatorType -> NFA -> NFA -> NFA
 binary_operator_to_NFA operator lchild rchild = case operator of
     And ->
@@ -119,8 +117,8 @@ binary_operator_to_NFA operator lchild rchild = case operator of
     _ -> error "Unexpected error"
 
 -- unary_operator_to_NFA operator child
--- @param operator unary operator
--- @param child operand of operator
+-- @param operator  unary operator
+-- @param child     operand of operator
 unary_operator_to_NFA :: REOperatorType -> NFA -> NFA
 unary_operator_to_NFA operator child = case operator of
     Repeat -> 
@@ -150,8 +148,8 @@ unary_operator_to_NFA operator child = case operator of
 
 regular_tokens_to_NFA :: [REToken] -> NFA
 -- regular_tokens_to_NFA' tokens s
--- @param tokens regular tokens
--- @param s output stack
+-- @param tokens    regular tokens
+-- @param s         output stack
 regular_tokens_to_NFA tokens = regular_tokens_to_NFA' tokens [] where
     regular_tokens_to_NFA' [] [nfa] = nfa
     regular_tokens_to_NFA' [] _ = error "Regular expression not valid!"
@@ -167,23 +165,3 @@ regular_tokens_to_NFA tokens = regular_tokens_to_NFA' tokens [] where
             (child : s_remain) -> regular_tokens_to_NFA' remain $ unary_operator_to_NFA Repeat child : s_remain
             _ -> error "Regular expression not valid!"
         _ -> error "Unexpected error"
-
-epsilon_closure_of_nfa_states :: NFA -> [NFAState] -> (Set.Set NFAState)
-epsilon_closure_of_nfa_states nfa nfa_states = epsilon_closure_of_nfa_states' nfa nfa_states Set.empty
-
-epsilon_closure_of_nfa_states' :: NFA -> [NFAState] -> (Set.Set NFAState) -> (Set.Set NFAState)
-epsilon_closure_of_nfa_states' _ [] output = output
-epsilon_closure_of_nfa_states' nfa nfa_states output = epsilon_closure_of_nfa_states' nfa nfa_states'' output'
-            where
-                nfa_state = head nfa_states
-                nfa_states' = tail nfa_states
-                output' = output `Set.union` (Set.fromList $ nfa_state : (nfa_edges nfa nfa_state Epsilon))
-                new_states = output' Set.\\ output
-                new_states' = Set.toList new_states
-                nfa_states'' = nfa_states' ++ new_states'
-
-terminal_closure_of_nfa_state :: NFA -> RECharType -> NFAState -> (Set.Set NFAState)
-terminal_closure_of_nfa_state nfa c state = Set.fromList $ nfa_edges nfa state c
-
-terminal_closure_of_nfa_states :: NFA -> RECharType -> (Set.Set NFAState) -> (Set.Set NFAState)
-terminal_closure_of_nfa_states nfa c nfa_states = Set.foldl (\new_nfa_states nfa_state -> Set.union new_nfa_states $ terminal_closure_of_nfa_state nfa c nfa_state) Set.empty nfa_states
