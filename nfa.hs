@@ -32,25 +32,25 @@ data NFA = NFA { nfa_states :: [NFAState]
 instance Show NFA where
     show nfa = states_str ++ "\n" ++ start_state_str ++ "\n" ++ end_state_str ++ "\n" ++ edges_str
         where
-            states_str = "States: " ++ (show $ nfa_states nfa)
+            nfa_states' = List.sort $ nfa_states nfa
+            states_str = "States: " ++ (show nfa_states')
             start_state_str = "Start state: " ++ (show $ nfa_start_state nfa)
             end_state_str = "End state: " ++ (show $ nfa_end_state nfa)
-            nfa_states' = List.sortOn (\(NFAState index) -> index) $ nfa_states nfa
             nfa_charset' = Epsilon : (Set.toList $ nfa_charset nfa)
             edges_str = show_state_edges nfa_states' nfa_charset' (nfa_edges nfa)
                 where
                     show_state_edges nfa_states nfa_charset nfa_edges = if List.null nfa_states
                         then ""
-                        else "\n" ++ (show_state_char_edges (head nfa_states') nfa_charset nfa_edges) ++ (show_state_edges (tail nfa_states) nfa_charset nfa_edges)
+                        else (show_state_char_edges (head nfa_states) nfa_charset nfa_edges) ++ (show_state_edges (tail nfa_states) nfa_charset nfa_edges)
                             where
                                 show_state_char_edges _ [] _ = ""
-                                show_state_char_edges nfa_state charset nfa_edges = (case next_state of
+                                show_state_char_edges nfa_state charset nfa_edges = (case next_states of
                                     [] -> "" 
-                                    xs -> show_state_char_edge nfa_state (head charset) xs ++ "\n") ++ show_state_char_edges nfa_state (tail charset) nfa_edges
+                                    xs -> show_state_char_edge nfa_state (head charset) xs) ++ show_state_char_edges nfa_state (tail charset) nfa_edges
                                     where
-                                        next_state = nfa_edges nfa_state $ head charset
+                                        next_states = nfa_edges nfa_state $ head charset
                                         show_state_char_edge _ _ [] = ""
-                                        show_state_char_edge nfa_state char next_state = show nfa_state ++ " -" ++ (show char) ++ "-> " ++ (show next_state) ++ "\n" ++ show_state_char_edge nfa_state char (tail next_state)
+                                        show_state_char_edge nfa_state char next_states = "\n" ++ show nfa_state ++ " -" ++ (show char) ++ "-> " ++ (show $ head next_states) ++ show_state_char_edge nfa_state char (tail next_states)
 
 
 shift_NFA :: Int -> NFA -> NFA
@@ -108,7 +108,10 @@ binary_operator_to_NFA operator lchild rchild = case operator of
                                             then nfa_edges lchild (NFAState index) c
                                             else 
                                                 if index == lend_index
-                                                    then nfa_start_state rchild' : (nfa_edges lchild (NFAState index) c)
+                                                    then 
+                                                        if c == Epsilon
+                                                            then nfa_start_state rchild' : (nfa_edges lchild (NFAState index) c)
+                                                            else nfa_edges rchild' (NFAState index) c
                                                     else nfa_edges rchild' (NFAState index) c
     Or -> 
         NFA { nfa_states = nfa_states'

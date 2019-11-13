@@ -72,12 +72,12 @@ instance Show DFA where
                 where
                     show_state_edges dfa_states dfa_charset dfa_edges = if List.null dfa_states
                         then ""
-                        else "\n" ++ (show_state_char_edges (head dfa_states') dfa_charset dfa_edges) ++ (show_state_edges (tail dfa_states) dfa_charset dfa_edges)
+                        else (show_state_char_edges (head dfa_states) dfa_charset dfa_edges) ++ (show_state_edges (tail dfa_states) dfa_charset dfa_edges)
                             where
                                 show_state_char_edges _ [] _ = ""
-                                show_state_char_edges dfa_state charset dfa_edges = case dfa_edges dfa_state (head charset) of
+                                show_state_char_edges dfa_state charset dfa_edges = (case dfa_edges dfa_state (head charset) of
                                     Nothing -> ""
-                                    Just next_state -> show dfa_state ++ " -" ++ (show $ head charset) ++ "-> " ++ (show next_state) ++ "\n" ++ show_state_char_edges dfa_state (tail charset) dfa_edges
+                                    Just next_state -> "\n" ++ show dfa_state ++ " -" ++ (show $ head charset) ++ "-> " ++ (show next_state)) ++ show_state_char_edges dfa_state (tail charset) dfa_edges
 
 
 -- constructor of DFA with a single DFAState and a given charset
@@ -133,14 +133,14 @@ nfa_to_dfa'' nfa nfa_charset dfa_state dfa = nfa_to_dfa'' nfa (tail nfa_charset)
                                 (\the_state@(DFAState the_index _) the_c ->
                                     if the_index == index && the_c == c
                                         then Just next_dfa_state'
-                                        else dfa_edges dfa the_state c
+                                        else dfa_edges dfa the_state the_c
                                 )
                             else
                                 dfa_edges dfa
             dfa_end_states' = if not $ Set.null $ Set.filter (\nfa_state -> nfa_end_state nfa == nfa_state) next_nfa_states
                                 then Set.insert next_dfa_state' $ dfa_end_states dfa
                                 else dfa_end_states dfa
-            dfa' = if not (Set.null next_nfa_states)
+            dfa' = if not $ Set.null next_nfa_states
                     then
                         DFA { dfa_states = encounted'
                             , dfa_charset = dfa_charset dfa

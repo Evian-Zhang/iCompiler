@@ -28,10 +28,11 @@ merge_dfa_states :: DFA -> [DFAState] -> DFA
 merge_dfa_states dfa dfa_states = merge_dfa_states' dfa dfa_state dfa_states
         where
             dfa_state = find_smallest_index dfa_states
-            to_merge = head dfa_states
-            dfa' = merge_dfa_state dfa dfa_state to_merge
             merge_dfa_states' dfa _ [] = dfa
             merge_dfa_states' dfa dfa_state dfa_states = merge_dfa_states' dfa' dfa_state $ tail dfa_states
+                where
+                    to_merge = head dfa_states
+                    dfa' = merge_dfa_state dfa dfa_state to_merge
 
 -- merge_dfa_state dfa dfa_state to_merge
 -- @brief merge a DFA state into another DFA state
@@ -49,8 +50,9 @@ merge_dfa_state dfa dfa_state to_merge = dfa'
             if index == to_merge_index
                 then Nothing
                 else case dfa_edges dfa the_state c of
-                    Just out_state@(DFAState out_index _) -> if out_index == to_merge_index then Just dfa_state else Just out_state
-                    Nothing -> Nothing
+                        Just out_state@(DFAState out_index _) -> 
+                            if out_index == to_merge_index then Just dfa_state else Just out_state
+                        Nothing -> Nothing
         dfa' = if dfa_state == to_merge
                 then dfa
                 else
@@ -78,7 +80,7 @@ split_dfa dfa = Set.foldl (\(non_acceptings, acceptings) dfa_state ->
 -- @brief p     current set of equivelent classes
 -- @brief w     set of remaining groups that haven't been divided
 hopcroft :: DFA -> Set.Set (Set.Set DFAState) -> Set.Set (Set.Set DFAState) -> Set.Set (Set.Set DFAState)
-hopcroft dfa p w = if null w then p else hopcroft dfa p' w'
+hopcroft dfa p w = if Set.null w then p else hopcroft dfa p' w'
     where
         a = Set.elemAt 0 w
         (w', p') = hopcroft_for_c dfa (Set.toList $ dfa_charset dfa) a (Set.deleteAt 0 w, p)
@@ -106,7 +108,7 @@ hopcroft_for_c dfa (c:cs) a (w, p) = hopcroft_for_c dfa cs a (w', p')
 -- @param ys        a set of equivalent classes used in the algorithm
 -- @param (w, p)    current (w, p)
 hopcroft_for_y :: DFA -> Set.Set DFAState -> Set.Set (Set.Set DFAState) -> (Set.Set (Set.Set DFAState), Set.Set (Set.Set DFAState)) -> (Set.Set (Set.Set DFAState), Set.Set (Set.Set DFAState))
-hopcroft_for_y dfa x ys (w, p) = if null ys then (w, p) else hopcroft_for_y dfa x ys' (w', p')
+hopcroft_for_y dfa x ys (w, p) = if Set.null ys then (w, p) else hopcroft_for_y dfa x ys' (w', p')
     where
         y = Set.elemAt 0 ys
         ys' = Set.deleteAt 0 ys
@@ -151,12 +153,12 @@ instance Show DFAO where
                 where
                     show_state_edges dfao_states dfao_charset dfao_edges = if List.null dfao_states
                         then ""
-                        else "\n" ++ (show_state_char_edges (head dfao_states') dfao_charset dfao_edges) ++ (show_state_edges (tail dfao_states) dfao_charset dfao_edges)
+                        else show_state_char_edges (head dfao_states) dfao_charset dfao_edges ++ (show_state_edges (tail dfao_states) dfao_charset dfao_edges)
                             where
                                 show_state_char_edges _ [] _ = ""
-                                show_state_char_edges dfao_state charset dfao_edges = case dfao_edges dfao_state (head charset) of
+                                show_state_char_edges dfao_state charset dfao_edges = (case dfao_edges dfao_state (head charset) of
                                     Nothing -> ""
-                                    Just next_state -> show dfao_state ++ " -" ++ (show $ head charset) ++ "-> " ++ (show next_state) ++ "\n" ++ show_state_char_edges dfao_state (tail charset) dfao_edges
+                                    Just next_state -> "\n" ++ (show dfao_state) ++ " -" ++ (show $ head charset) ++ "-> " ++ (show next_state)) ++ show_state_char_edges dfao_state (tail charset) dfao_edges
 
 -- @brief renumber the states in DFA
 -- @discuss for example, the reduced dfa has states: 0, 2, 4, 5. Then, renumber it to 0, 1, 2, 3
@@ -186,24 +188,28 @@ dfa_to_dfao dfa = DFAO { dfao_states = dfao_states'
                        , dfao_end_states = dfao_end_states'
                        }
     where
-        (index_map, reverse_index_map) = get_index_map $ dfa_states dfa
+        (non_acceptings, acceptings) = split_dfa dfa
+        equivalent_classes = Set.fromList [Set.fromList non_acceptings, Set.fromList acceptings]
+        equivalent_classes' = hopcroft dfa equivalent_classes equivalent_classes
+        dfa' = reduce_dfa_states dfa $ Set.toList equivalent_classes'
+        (index_map, reverse_index_map) = get_index_map $ dfa_states dfa'
         dfao_states' = Set.map (\(DFAState index _) -> case index_map index of
                                     Just a -> DFAOState a
-                                    Nothing -> error "Unexpected error") $ dfa_states dfa
+                                    Nothing -> error "Unexpected error") $ dfa_states dfa'
         dfao_edges' = (\(DFAOState index) c -> 
             case reverse_index_map index of
-                Just a -> case dfa_edges dfa (DFAState a Set.empty) c of
+                Just a -> case dfa_edges dfa' (DFAState a Set.empty) c of
                             Just (DFAState x _) -> case index_map x of 
                                         Just y -> Just (DFAOState y)
                                         Nothing -> error "Unexpected error"
-                            Nothing -> error "Unexpected error"
+                            Nothing -> Nothing
                 Nothing -> Nothing
             )
-        DFAState start_index _ = dfa_start_state dfa
+        DFAState start_index _ = dfa_start_state dfa'
         dfao_start_state' = DFAOState (case index_map start_index of
                                         Just x -> x
                                         Nothing -> error "Unexpected error")
         dfao_end_states' = Set.map (\(DFAState index _) -> 
             DFAOState (case index_map index of
                         Just x -> x
-                        Nothing -> error "Unexpected error")) $ dfa_end_states dfa
+                        Nothing -> error "Unexpected error")) $ dfa_end_states dfa'
