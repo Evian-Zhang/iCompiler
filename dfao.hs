@@ -61,6 +61,7 @@ merge_dfa_state dfa dfa_state to_merge = dfa'
                         , dfa_edges = dfa_edges'
                         , dfa_start_state = dfa_start_state dfa
                         , dfa_end_states = dfa_end_states'
+                        , dfa_id = dfa_id dfa
                         }
 
 -- split_dfa dfa
@@ -69,11 +70,34 @@ merge_dfa_state dfa dfa_state to_merge = dfa'
 -- @return (non_accpetings, acceptings)
 --          non_accpetings:     the set of DFA states which is not an accpeting state
 --          acceptings:         the set of DFA states which is an accepting state
-split_dfa :: DFA -> ([DFAState], [DFAState])
-split_dfa dfa = Set.foldl (\(non_acceptings, acceptings) dfa_state ->
-                            if Set.member dfa_state $ dfa_end_states dfa
-                                then (non_acceptings, dfa_state : acceptings)
-                                else (dfa_state : non_acceptings, acceptings)) ([], []) (dfa_states dfa)
+split_dfa :: DFA -> Set.Set (Set.Set DFAState)
+split_dfa dfa = Set.insert non_acceptings $ Set.fold 
+                    (\id acceptings -> 
+                        Set.insert (case classes id of 
+                                        Just x -> x
+                                        Nothing -> error "Unexpected error")
+                                    acceptings) Set.empty ids
+    where
+        (ids, non_acceptings, classes) = split_dfa' dfa (dfa_states dfa) Set.empty Set.empty (\_ -> Nothing)
+            where
+                split_dfa' dfa states ids non_acceptings classes = if Set.null states
+                    then (ids, non_acceptings, classes)
+                    else
+                        split_dfa' dfa (Set.deleteAt 0 states) ids' non_acceptings' classes'
+                            where
+                                the_state = Set.elemAt 0 states
+                                (non_acceptings', ids', classes') = case dfa_id dfa the_state of
+                                    Just id ->
+                                        if Set.member id ids
+                                            then (non_acceptings, ids, (\the_id -> if the_id == id
+                                                then Just $ Set.insert the_state (case classes id of
+                                                                                    Just x -> x
+                                                                                    Nothing -> error "Unexpected error")
+                                                else classes id))
+                                            else (non_acceptings, Set.insert id ids, (\the_id -> if the_id == id
+                                                then Just $ Set.singleton the_state
+                                                else classes id))
+                                    Nothing -> (Set.insert the_state non_acceptings, ids, classes)
 
 -- hopcroft dfa p w
 -- @brief Hopcroft algorthim to minimize DFA
@@ -139,6 +163,7 @@ data DFAO = DFAO { dfao_states :: Set.Set DFAOState
                  , dfao_edges :: (DFAOState -> RECharType -> (Maybe DFAOState))
                  , dfao_start_state :: DFAOState
                  , dfao_end_states :: Set.Set DFAOState
+                 , dfao_id :: (DFAOState -> Maybe REID)
                  }
 
 instance Show DFAO where
@@ -147,7 +172,11 @@ instance Show DFAO where
             dfao_states' = Set.toList $  dfao_states dfao
             states_str = "States:\n" ++ (show dfao_states')
             start_state_str = "Start state: " ++ (show $ dfao_start_state dfao)
-            end_states_str = "End states: " ++ (show $ Set.toList $ dfao_end_states dfao)
+            end_states_str = "End state: " ++ (show $ Set.map 
+                                (\state -> ((case dfao_id dfao state of
+                                                Just id -> (id, state)
+                                                Nothing -> error "Unexpected error"
+                                ), state)) $ dfao_end_states dfao)
             dfao_charset' = Set.toList $ dfao_charset dfao
             edges_str = show_state_edges dfao_states' dfao_charset' (dfao_edges dfao)
                 where
@@ -186,10 +215,10 @@ dfa_to_dfao dfa = DFAO { dfao_states = dfao_states'
                        , dfao_edges = dfao_edges'
                        , dfao_start_state = dfao_start_state'
                        , dfao_end_states = dfao_end_states'
+                       , dfao_id = dfao_id'
                        }
     where
-        (non_acceptings, acceptings) = split_dfa dfa
-        equivalent_classes = Set.fromList [Set.fromList non_acceptings, Set.fromList acceptings]
+        equivalent_classes = split_dfa dfa
         equivalent_classes' = hopcroft dfa equivalent_classes equivalent_classes
         dfa' = reduce_dfa_states dfa $ Set.toList equivalent_classes'
         (index_map, reverse_index_map) = get_index_map $ dfa_states dfa'
@@ -213,3 +242,8 @@ dfa_to_dfao dfa = DFAO { dfao_states = dfao_states'
             DFAOState (case index_map index of
                         Just x -> x
                         Nothing -> error "Unexpected error")) $ dfa_end_states dfa'
+        dfao_id' = \(DFAOState index) -> 
+            (case reverse_index_map index of
+                Just a -> dfa_id dfa' (DFAState a Set.empty)
+                Nothing -> Nothing
+            )

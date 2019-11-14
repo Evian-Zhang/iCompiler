@@ -2,6 +2,7 @@ module Re
 ( REOperatorType (And, Or, Repeat)
 , RECharType (CommonChar, Epsilon)
 , REToken (REChar, REOperator, ParenOpen, ParenClose)
+, REID (REID)
 , tokenize_regular_expression
 , shunting_yard
 ) where
@@ -12,11 +13,21 @@ import qualified Data.List as List
 data REOperatorType = And | Or | Repeat deriving (Eq, Show, Ord)
 data RECharType = CommonChar Char | Epsilon deriving (Eq, Ord)
 data REToken = REChar RECharType | REOperator REOperatorType | ParenOpen | ParenClose deriving (Eq, Show, Ord)
+data REID = REID Int String
 
 instance Show RECharType where
     show c = case c of
                 CommonChar common_char -> show common_char
                 Epsilon -> "ε"
+
+instance Eq REID where
+    (==) (REID priority1 _) (REID priority2 _) = priority1 == priority2
+                
+instance Ord REID where
+    compare (REID priority1 _) (REID priority2 _) = compare priority1 priority2
+
+instance Show REID where
+    show (REID _ description) = show description
 
 tokenize_regular_char :: Char -> REToken
 tokenize_regular_char operator = case operator of
