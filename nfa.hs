@@ -233,7 +233,7 @@ shift_NFA index nfa =
         nfa_end_states' = List.map (\state -> shift_state index state) $ nfa_end_states nfa
         nfa_states' = List.map (shift_state index) (nfa_states nfa)
         nfa_edges' = \state c -> List.map (shift_state index) $ nfa_edges nfa (shift_state (negate index) state) c
-        nfa_id' = \state -> nfa_id nfa $ shift_state index state
+        nfa_id' = \state -> nfa_id nfa $ shift_state (negate index) state
 
 merge_nfas :: NFA -> NFA -> NFA
 merge_nfas nfa1 nfa2 = NFA { nfa_states = nfa_states'
@@ -245,14 +245,14 @@ merge_nfas nfa1 nfa2 = NFA { nfa_states = nfa_states'
                            }
     where
         nfa1' = shift_NFA 1 nfa1
-        nfa1_end_index = List.length (nfa_states nfa1') + 1
+        nfa1_end_index = List.length (nfa_states nfa1')
         nfa2' = shift_NFA (nfa1_end_index + 1) nfa2
         nfa_start_state' = NFAState 0
         nfa_states' = nfa_start_state' : (nfa_states nfa1') ++ (nfa_states nfa2')
         nfa_charset' = Set.union (nfa_charset nfa1) (nfa_charset nfa2)
         nfa_edges' = (\state@(NFAState index) c ->
                 if index == 0 && c == Epsilon
-                    then [nfa_start_state nfa1, nfa_start_state nfa2]
+                    then [nfa_start_state nfa1', nfa_start_state nfa2']
                     else 
                         if index <= nfa1_end_index
                             then nfa_edges nfa1' state c
