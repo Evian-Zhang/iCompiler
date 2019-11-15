@@ -17,7 +17,7 @@ import Re
 import NFA
 
 -- epsilon_closure_of_nfa_states nfa nfa_states
--- @breif find the epsilon closure of set nfa_states
+-- @brief find the epsilon closure of set nfa_states
 epsilon_closure_of_nfa_states :: NFA -> [NFAState] -> (Set.Set NFAState)
 epsilon_closure_of_nfa_states nfa nfa_states = epsilon_closure_of_nfa_states' nfa nfa_states Set.empty
 
@@ -86,7 +86,7 @@ instance Show DFA where
                                     Just next_state -> "\n" ++ show dfa_state ++ " -" ++ (show $ head charset) ++ "-> " ++ (show next_state)) ++ show_state_char_edges dfa_state (tail charset) dfa_edges
 
 
--- constructor of DFA with a single DFAState and a given charset
+-- constructor of DFA with a single DFAState and a given nfa
 single_dfa :: DFAState -> NFA -> DFA
 single_dfa dfa_state nfa = DFA { dfa_states = Set.singleton dfa_state
                                    , dfa_charset = nfa_charset nfa

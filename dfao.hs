@@ -65,11 +65,8 @@ merge_dfa_state dfa dfa_state to_merge = dfa'
                         }
 
 -- split_dfa dfa
--- @brief split a given DFA into two sets of DFA states, corresponding to whether it is an accpeting state
--- @param dfa                   the DFA to be split
--- @return (non_accpetings, acceptings)
---          non_accpetings:     the set of DFA states which is not an accpeting state
---          acceptings:         the set of DFA states which is an accepting state
+-- @brief split a given DFA into sets of DFA states, corresponding to whether it is a non-accpeting state, or it is an accepting state belonging to a same id
+-- @param dfa       the DFA to be split
 split_dfa :: DFA -> Set.Set (Set.Set DFAState)
 split_dfa dfa = Set.insert non_acceptings $ Set.fold 
                     (\id acceptings -> 
