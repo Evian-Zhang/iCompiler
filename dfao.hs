@@ -6,6 +6,7 @@ module DFAO
 , dfao_charset
 , dfao_end_states
 , dfao_edges
+, dfao_id
 , dfa_to_dfao
 ) where
 

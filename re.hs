@@ -17,7 +17,7 @@ data REID = REID Int String
 
 instance Show RECharType where
     show c = case c of
-                CommonChar common_char -> show common_char
+                CommonChar common_char -> [common_char]
                 Epsilon -> "ε"
 
 instance Eq REID where
@@ -27,7 +27,7 @@ instance Ord REID where
     compare (REID priority1 _) (REID priority2 _) = compare priority1 priority2
 
 instance Show REID where
-    show (REID _ description) = show description
+    show (REID _ description) = description
 
 tokenize_regular_char :: Char -> REToken
 tokenize_regular_char operator = case operator of
