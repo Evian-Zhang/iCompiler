@@ -84,20 +84,22 @@ split_dfa dfa = Set.insert non_acceptings $ Set.fold
                     then (ids, non_acceptings, classes)
                     else
                         split_dfa' dfa (Set.deleteAt 0 states) ids' non_acceptings' classes'
-                            where
-                                the_state = Set.elemAt 0 states
-                                (non_acceptings', ids', classes') = case dfa_id dfa the_state of
-                                    Just id ->
-                                        if Set.member id ids
-                                            then (non_acceptings, ids, (\the_id -> if the_id == id
-                                                then Just $ Set.insert the_state (case classes id of
-                                                                                    Just x -> x
-                                                                                    Nothing -> error "Unexpected error")
-                                                else classes id))
-                                            else (non_acceptings, Set.insert id ids, (\the_id -> if the_id == id
-                                                then Just $ Set.singleton the_state
-                                                else classes id))
-                                    Nothing -> (Set.insert the_state non_acceptings, ids, classes)
+                    where
+                        the_state = Set.elemAt 0 states
+                        (non_acceptings', ids', classes') = case dfa_id dfa the_state of
+                            Just id ->
+                                if Set.member id ids
+                                    then (non_acceptings, ids, (\the_id -> 
+                                        if the_id == id
+                                            then Just $ Set.insert the_state (case classes id of
+                                                                            Just x -> x
+                                                                            Nothing -> error "Unexpected error")
+                                            else classes the_id))
+                                    else (non_acceptings, Set.insert id ids, (\the_id ->
+                                        if the_id == id
+                                            then Just $ Set.singleton the_state
+                                            else classes the_id))
+                            Nothing -> (Set.insert the_state non_acceptings, ids, classes)
 
 -- hopcroft dfa p w
 -- @brief Hopcroft algorthim to minimize DFA
@@ -172,11 +174,11 @@ instance Show DFAO where
             dfao_states' = Set.toList $  dfao_states dfao
             states_str = "States:\n" ++ (show dfao_states')
             start_state_str = "Start state: " ++ (show $ dfao_start_state dfao)
-            end_states_str = "End state: " ++ (show $ Set.map 
+            end_states_str = "End state: " ++ (show $ List.map 
                                 (\state -> ((case dfao_id dfao state of
-                                                Just id -> (id, state)
+                                                Just id -> id
                                                 Nothing -> error "Unexpected error"
-                                ), state)) $ dfao_end_states dfao)
+                                ), state)) $ Set.toList $ dfao_end_states dfao)
             dfao_charset' = Set.toList $ dfao_charset dfao
             edges_str = show_state_edges dfao_states' dfao_charset' (dfao_edges dfao)
                 where

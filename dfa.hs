@@ -68,7 +68,7 @@ instance Show DFA where
             start_state_str = "Start state: " ++ (show $ dfa_start_state dfa)
             end_states_str = "End states: " ++ (show $ List.map 
                                                 (\state -> ((case dfa_id dfa state of
-                                                                Just id -> (id, state)
+                                                                Just id -> id
                                                                 Nothing -> error "Unexpected error"
                                                             ), state)) $ Set.toList $ dfa_end_states dfa)
             dfa_charset' = Set.toList $ dfa_charset dfa
@@ -87,18 +87,39 @@ instance Show DFA where
 
 
 -- constructor of DFA with a single DFAState and a given charset
-single_dfa :: DFAState -> (Set.Set RECharType) -> DFA
-single_dfa dfa_state charset = DFA { dfa_states = Set.singleton dfa_state
-                                   , dfa_charset = charset
+single_dfa :: DFAState -> NFA -> DFA
+single_dfa dfa_state nfa = DFA { dfa_states = Set.singleton dfa_state
+                                   , dfa_charset = nfa_charset nfa
                                    , dfa_edges = (\_ _ -> Nothing)
                                    , dfa_start_state = dfa_state
-                                   , dfa_end_states = Set.empty
-                                   , dfa_id = (\_ -> Nothing)
+                                   , dfa_end_states = dfa_end_states'
+                                   , dfa_id = dfa_id'
                                    }
+    where
+        DFAState dfa_index nfa_states' = dfa_state
+        nfa_end_states' = Set.filter (\nfa_state -> List.elem nfa_state $ nfa_end_states nfa) nfa_states'
+        dfa_end_states' = if Set.null nfa_end_states' then Set.empty else Set.singleton dfa_state
+        next_dfa_id = Set.fold (\the_state id -> 
+            case nfa_id nfa the_state of
+                Just id' -> if id' < id
+                                then (case nfa_id nfa the_state of 
+                                        Just x -> x
+                                        Nothing -> error "Unexpcted error")
+                                else id
+                Nothing -> error "Unexpcted error")
+            (case nfa_id nfa $ Set.elemAt 0 nfa_end_states' of
+                Just id -> id
+                Nothing -> error "Unexpected error")
+            nfa_end_states'
+        dfa_id' = if not $ Set.null nfa_end_states'
+                    then (\state@(DFAState the_index _) -> if the_index == dfa_index
+                        then Just next_dfa_id
+                        else Nothing)
+                    else (\_ -> Nothing)
 
 -- convert NFA to DFA
 nfa_to_dfa :: NFA -> DFA
-nfa_to_dfa nfa = nfa_to_dfa' nfa [initial_dfa_state] $ single_dfa initial_dfa_state $ nfa_charset nfa
+nfa_to_dfa nfa = nfa_to_dfa' nfa [initial_dfa_state] $ single_dfa initial_dfa_state nfa
     where
         initial_dfa_state = DFAState 0 $ epsilon_closure_of_nfa_states nfa [nfa_start_state nfa]
 

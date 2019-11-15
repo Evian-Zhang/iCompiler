@@ -189,7 +189,7 @@ instance Show NFA where
             start_state_str = "Start state: " ++ (show $ nfa_start_state nfa)
             end_state_str = "End state: " ++ (show $ List.map 
                                 (\state -> ((case nfa_id nfa state of
-                                                Just id -> (id, state)
+                                                Just id -> id
                                                 Nothing -> error "Unexpected error"
                                 ), state)) $ nfa_end_states nfa)
             nfa_charset' = Epsilon : (Set.toList $ nfa_charset nfa)
