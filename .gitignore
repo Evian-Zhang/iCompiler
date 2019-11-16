@@ -1,6 +1,6 @@
 .DS_Store
 lex
-scanner
+scan
 *.hi
 *.o
 *.l
