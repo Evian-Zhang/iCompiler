@@ -1,4 +1,4 @@
-module InputParser
+module Input_Parser
 ( edges_to_fa
 , update_ids
 ) where

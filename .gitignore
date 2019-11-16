@@ -1,5 +1,6 @@
 .DS_Store
 lex
+scanner
 *.hi
 *.o
 *.l
