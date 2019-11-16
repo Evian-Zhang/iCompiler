@@ -5,3 +5,4 @@ scan
 *.o
 *.l
 *.csv
+*.txt
