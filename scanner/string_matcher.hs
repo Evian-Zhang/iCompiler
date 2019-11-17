@@ -21,7 +21,7 @@ match_one_token string fa current_state (matched_string, matched_token) = (match
         (matched_string', matched_token') = if length string > 0
             then
                 case edges fa current_state $ head string of
-                    Just next_state -> case ids fa current_state of
+                    Just next_state -> case ids fa next_state of
                         Just id -> match_one_token (tail string) fa next_state new_pair
                             where
                                 new_string = matched_string ++ [head string]
