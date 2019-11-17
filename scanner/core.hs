@@ -13,7 +13,10 @@ module Core
 
 data State = State Int deriving (Eq, Ord, Show)
 
-data ID = ID String deriving (Show)
+data ID = ID String
+
+instance Show ID where
+    show (ID str) = str
 
 data FA = FA { states :: [State]
              , charset :: [Char]
