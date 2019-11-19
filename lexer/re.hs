@@ -1,5 +1,5 @@
 module Re
-( REOperatorType (And, Or, Repeat)
+( REOperatorType (And, Or, Repeat, RepeatAtLeastOnce, RepeatAtMostOnce)
 , RECharType (CommonChar, Epsilon)
 , REToken (REChar, REOperator, ParenOpen, ParenClose)
 , REID (REID)
@@ -10,7 +10,7 @@ module Re
 import qualified Data.Set as Set
 import qualified Data.List as List
 
-data REOperatorType = And | Or | Repeat deriving (Eq, Show, Ord)
+data REOperatorType = And | Or | Repeat | RepeatAtLeastOnce | RepeatAtMostOnce deriving (Eq, Show, Ord)
 data RECharType = CommonChar Char | Epsilon deriving (Eq, Ord)
 data REToken = REChar RECharType | REOperator REOperatorType | ParenOpen | ParenClose deriving (Eq, Show, Ord)
 data REID = REID Int String
@@ -38,6 +38,8 @@ tokenize_regular_char operator = case operator of
     '.' -> REOperator And
     '|' -> REOperator Or
     '*' -> REOperator Repeat
+    '+' -> REOperator RepeatAtLeastOnce
+    '?' -> REOperator RepeatAtMostOnce
     '(' -> ParenOpen
     ')' -> ParenClose
     c   -> REChar (CommonChar c)
@@ -59,6 +61,8 @@ priority token = case token of
     REOperator Or -> 0
     REOperator And -> 1
     REOperator Repeat -> 2
+    REOperator RepeatAtLeastOnce -> 2
+    REOperator RepeatAtMostOnce -> 2
     ParenOpen -> 3
     ParenClose -> 3
     REChar _ -> 4

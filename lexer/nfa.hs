@@ -151,6 +151,52 @@ unary_operator_to_SingleNFA operator child = case operator of
                                 if index == end_index' && c == Epsilon
                                     then single_nfa_end_state' : (single_nfa_start_state child' : (single_nfa_edges child' (NFAState index) c))
                                     else []
+    RepeatAtLeastOnce ->
+        SingleNFA { single_nfa_states = single_nfa_states'
+                  , single_nfa_charset = single_nfa_charset child
+                  , single_nfa_edges = single_nfa_edges'
+                  , single_nfa_start_state = single_nfa_start_state'
+                  , single_nfa_end_state = single_nfa_end_state'
+                  }
+        where
+        single_nfa_start_state' = NFAState 0
+        child' = shift_SingleNFA 1 child
+        NFAState end_index' = single_nfa_end_state child'
+        single_nfa_end_state' = NFAState (end_index' + 1)
+        single_nfa_states' = single_nfa_start_state' : (single_nfa_end_state' : (single_nfa_states child'))
+        single_nfa_edges' = \(NFAState index) c ->
+            if index == 0 && c == Epsilon
+                then [single_nfa_start_state child']
+                else
+                    if index < end_index'
+                        then single_nfa_edges child' (NFAState index) c
+                        else 
+                            if index == end_index' && c == Epsilon
+                                then single_nfa_end_state' : (single_nfa_start_state child' : (single_nfa_edges child' (NFAState index) c))
+                                else []
+    RepeatAtMostOnce ->
+        SingleNFA { single_nfa_states = single_nfa_states'
+                  , single_nfa_charset = single_nfa_charset child
+                  , single_nfa_edges = single_nfa_edges'
+                  , single_nfa_start_state = single_nfa_start_state'
+                  , single_nfa_end_state = single_nfa_end_state'
+                  }
+        where
+        single_nfa_start_state' = NFAState 0
+        child' = shift_SingleNFA 1 child
+        NFAState end_index' = single_nfa_end_state child'
+        single_nfa_end_state' = NFAState (end_index' + 1)
+        single_nfa_states' = single_nfa_start_state' : (single_nfa_end_state' : (single_nfa_states child'))
+        single_nfa_edges' = \(NFAState index) c ->
+            if index == 0 && c == Epsilon
+                then [single_nfa_start_state child']
+                else
+                    if index < end_index'
+                        then single_nfa_edges child' (NFAState index) c
+                        else 
+                            if index == end_index' && c == Epsilon
+                                then single_nfa_end_state' : (single_nfa_edges child' (NFAState index) c)
+                                else []
     _ -> error "Unexpected error"
 
 regular_tokens_to_SingleNFA :: [REToken] -> SingleNFA
@@ -170,6 +216,12 @@ regular_tokens_to_SingleNFA tokens = regular_tokens_to_SingleNFA' tokens [] wher
             _ -> error "Regular expression not valid!"
         REOperator Repeat -> case s of 
             (child : s_remain) -> regular_tokens_to_SingleNFA' remain $ unary_operator_to_SingleNFA Repeat child : s_remain
+            _ -> error "Regular expression not valid!"
+        REOperator RepeatAtLeastOnce -> case s of
+            (child : s_remain) -> regular_tokens_to_SingleNFA' remain $ unary_operator_to_SingleNFA RepeatAtLeastOnce child : s_remain
+            _ -> error "Regular expression not valid!"
+        REOperator RepeatAtMostOnce -> case s of
+            (child : s_remain) -> regular_tokens_to_SingleNFA' remain $ unary_operator_to_SingleNFA RepeatAtMostOnce child : s_remain
             _ -> error "Regular expression not valid!"
         _ -> error "Unexpected error"
 
