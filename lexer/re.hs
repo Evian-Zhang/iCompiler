@@ -17,7 +17,11 @@ data REID = REID Int String
 
 instance Show RECharType where
     show c = case c of
-                CommonChar common_char -> [common_char]
+                CommonChar common_char -> case common_char of
+                    '\n' -> "\\n"
+                    '\t' -> "\\t"
+                    '\\' -> "\\"
+                    _ -> [common_char]
                 Epsilon -> "ε"
 
 instance Eq REID where
@@ -39,7 +43,16 @@ tokenize_regular_char operator = case operator of
     c   -> REChar (CommonChar c)
 
 tokenize_regular_expression :: String -> [REToken]
-tokenize_regular_expression xs = foldl (\tokens c -> tokens ++ [tokenize_regular_char c]) [] xs
+tokenize_regular_expression [] = []
+tokenize_regular_expression (c:cs) = case c of
+    '\\' -> if List.length cs == 0
+                then error "Invalid escape character"
+                else (case head cs of
+                    'n' -> REChar (CommonChar '\n')
+                    't' -> REChar (CommonChar '\t')
+                    '\\' -> REChar (CommonChar '\\')
+                    _ -> error "Invalid escape character") : (tokenize_regular_expression $ tail cs)
+    _ -> tokenize_regular_char c : tokenize_regular_expression cs
 
 priority :: REToken -> Int
 priority token = case token of

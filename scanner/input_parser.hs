@@ -60,7 +60,15 @@ edges_to_fa str = fa
     where
         fa1 = empty_fa
         (cs:body) = lines str
-        fa2 = update_charset fa1 $ map (\str -> head str) $ wordsWhen (==',') $ tail cs
+        fa2 = update_charset fa1 $ map (\str ->
+            (case head str of
+                '\\' -> case head $ tail str of
+                            'n' -> '\n'
+                            't' -> '\t'
+                            '\\' -> '\\'
+                            _ -> error "Unexpcted error"
+                _ -> head str
+            )) $ wordsWhen (==',') $ tail cs
         fa = foldl (\fa' line -> update_state fa' $ wordsWhen (==',') line) fa2 body
 
 update_ids :: FA -> String -> FA

@@ -11,8 +11,8 @@ import DFAO
 display_dfao_edges :: DFAO -> String
 display_dfao_edges dfao = "," ++ (display_dfao_charset $ Set.toList $ dfao_charset dfao) ++ "\n" ++ (display_dfao_edges' (Set.toList $ dfao_states dfao) (Set.toList $ dfao_charset dfao) (dfao_edges dfao))
     where
-        display_dfao_charset [CommonChar c] = [c]
-        display_dfao_charset ((CommonChar c):cs) = c : (',' : (display_dfao_charset cs))
+        display_dfao_charset [c] = show c
+        display_dfao_charset (c:cs) = show c ++ (',' : (display_dfao_charset cs))
         display_dfao_edges' [dfao_state] charset edges = show dfao_state ++ "," ++ (display_dfao_state dfao_state charset edges)
         display_dfao_edges' (dfao_state:remain) charset edges = show dfao_state ++ "," ++ (display_dfao_state dfao_state charset edges) ++ "\n" ++ (display_dfao_edges' remain charset edges)
         display_dfao_state dfao_state [c] edges = case edges dfao_state c of
