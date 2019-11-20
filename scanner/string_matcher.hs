@@ -10,7 +10,7 @@ match_string string fa tokens = case maybe_token of
         Just token@(Token matched_string _) -> match_string (drop (length matched_string) string) fa (tokens ++ [token])
         Nothing -> if length string == 0
                     then Just tokens
-                    else Nothing
+                    else error string
     where
         (_, maybe_token) = match_one_token string fa (start_state fa) ("", Nothing)
 

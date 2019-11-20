@@ -55,20 +55,26 @@ update_ids' fa (header:body:_) = FA { states = states fa
         the_state = State $ read header
         ids' = (\state -> if state == the_state then Just $ ID body else ids fa state)
 
+handle_charset_row :: String -> [Char]
+handle_charset_row [] = []
+handle_charset_row str = 
+    if take 4 str == "\"\"\"\""
+        then '"' : (handle_charset_row $ drop 5 str)
+        else if take 3 str == "\",\""
+            then ',' : (handle_charset_row $ drop 4 str)
+            else (case head str of
+                '\\' -> case head $ tail str of
+                    'n' -> '\n' : (handle_charset_row $ drop 3 str)
+                    't' -> '\t' : (handle_charset_row $ drop 3 str)
+                    _ -> '\\' : (handle_charset_row $ drop 2 str)
+                c -> c : (handle_charset_row $ drop 2 str))
+
 edges_to_fa :: String -> FA
 edges_to_fa str = fa
     where
         fa1 = empty_fa
         (cs:body) = lines str
-        fa2 = update_charset fa1 $ map (\str ->
-            (case head str of
-                '\\' -> case head $ tail str of
-                            'n' -> '\n'
-                            't' -> '\t'
-                            '\\' -> '\\'
-                            _ -> error "Unexpcted error"
-                _ -> head str
-            )) $ wordsWhen (==',') $ tail cs
+        fa2 = update_charset fa1 $ handle_charset_row $ tail cs
         fa = foldl (\fa' line -> update_state fa' $ wordsWhen (==',') line) fa2 body
 
 update_ids :: FA -> String -> FA

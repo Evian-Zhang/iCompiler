@@ -189,7 +189,7 @@ unary_operator_to_SingleNFA operator child = case operator of
         single_nfa_states' = single_nfa_start_state' : (single_nfa_end_state' : (single_nfa_states child'))
         single_nfa_edges' = \(NFAState index) c ->
             if index == 0 && c == Epsilon
-                then [single_nfa_start_state child']
+                then [single_nfa_start_state child', single_nfa_end_state' ]
                 else
                     if index < end_index'
                         then single_nfa_edges child' (NFAState index) c

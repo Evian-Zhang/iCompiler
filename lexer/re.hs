@@ -20,7 +20,8 @@ instance Show RECharType where
                 CommonChar common_char -> case common_char of
                     '\n' -> "\\n"
                     '\t' -> "\\t"
-                    '\\' -> "\\"
+                    '"' -> "\"\"\"\""
+                    ',' -> "\",\""
                     _ -> [common_char]
                 Epsilon -> "ε"
 
@@ -53,6 +54,13 @@ tokenize_regular_expression (c:cs) = case c of
                     'n' -> REChar (CommonChar '\n')
                     't' -> REChar (CommonChar '\t')
                     '\\' -> REChar (CommonChar '\\')
+                    '.' -> REChar (CommonChar '.')
+                    '*' -> REChar (CommonChar '*')
+                    '|' -> REChar (CommonChar '|')
+                    '?' -> REChar (CommonChar '?')
+                    '+' -> REChar (CommonChar '+')
+                    '(' -> REChar (CommonChar '(')
+                    ')' -> REChar (CommonChar ')')
                     _ -> error "Invalid escape character") : (tokenize_regular_expression $ tail cs)
     _ -> tokenize_regular_char c : tokenize_regular_expression cs
 
