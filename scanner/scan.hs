@@ -18,7 +18,7 @@ main = do
             string_str <- readFile string_path
             let fa = update_ids (edges_to_fa edges_str) end_states_str
                 tokens = match_string string_str fa []
-                tokens_str = case tokens of
-                                Just tokens -> show tokens
-                                Nothing -> "Match error"
-            putStrLn tokens_str
+                just_tokens = case tokens of
+                                Just tokens -> tokens
+                                Nothing -> error "Match error"
+            mapM_ print just_tokens
