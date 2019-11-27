@@ -1,4 +1,14 @@
-module DFA where
+module DFA
+( LRItem (LRItem)
+, LRCollection (LRCollection)
+, DFA (DFA)
+, collections
+, dfa_symbols
+, start_collection
+, goto
+, grammar_to_DFA
+)
+where
 
 import CFG
 
@@ -21,7 +31,7 @@ augment_grammar grammar = Grammar { symbols = symbols'
 data LRItem = LRItem Symbol RHS Int deriving (Eq, Ord)
 
 instance Show LRItem where
-    show (LRItem lhs rhs index) = show rhs ++ "->" ++ (show_rhs rhs index)
+    show (LRItem lhs rhs index) = show lhs ++ "->" ++ (show_rhs rhs index)
         where
             show_rhs_list rhs = List.foldl (\str symbol -> str ++ (show symbol)) [] rhs
             show_rhs rhs index = show_rhs_list (take index rhs) ++ "." ++ (show_rhs_list $ drop index rhs)
@@ -70,9 +80,29 @@ instance Ord LRCollection where
     compare (LRCollection _ items1) (LRCollection _ items2) = compare items1 items2
 
 data DFA = DFA { collections :: Set.Set LRCollection
+               , dfa_symbols :: Set.Set Symbol
                , start_collection :: LRCollection
                , goto :: LRCollection -> Symbol -> Maybe LRCollection
                }
+
+instance Show DFA where
+    show dfa = collections_str ++ "\n" ++ start_collection_str ++ "\n" ++ goto_str
+        where
+            collections' = List.sortOn (\(LRCollection index _) -> index) $ Set.toList $ collections dfa
+            collections_str = "Collections:" ++ (List.foldl (\str collection -> str ++ "\n" ++ (show collection)) "" collections')
+            start_collection_str = "Start collection:\n" ++ (show $ start_collection dfa)
+            goto_str = "Goto:" ++ (display_goto_str dfa collections')
+                where
+                    display_goto_str _ [] = ""
+                    display_goto_str dfa (collection:remain) = display_goto_str' dfa collection (Set.toList $ dfa_symbols dfa) ++ (display_goto_str dfa remain)
+                        where
+                            display_goto_str' _ _ [] = ""
+                            display_goto_str' dfa collection@(LRCollection index1 _) (symbol:remain) = str ++ display_goto_str' dfa collection remain
+                                where
+                                    next = goto dfa collection symbol
+                                    str = case next of
+                                            Just (LRCollection index2 _) -> "\n" ++ (show index1) ++ " -" ++ (show symbol) ++ "-> " ++ (show index2)
+                                            Nothing -> ""
 
 grammar_to_DFA :: Grammar -> DFA
 grammar_to_DFA grammar = dfa
@@ -81,6 +111,7 @@ grammar_to_DFA grammar = dfa
         start_item = LRItem start_symbol' (Set.elemAt 0 $ productions grammar start_symbol') 0
         start_collection' = LRCollection 0 $ closure_items grammar $ Set.singleton start_item
         dfa' = DFA { collections = Set.singleton start_collection'
+                   , dfa_symbols = symbols grammar
                    , start_collection = start_collection'
                    , goto = (\_ _ -> Nothing)
                    }
@@ -109,7 +140,7 @@ grammar_to_DFA'' grammar collection@(LRCollection _ items) (s:remain) dfa = gram
         goto' = (\collection' symbol -> 
                     if collection' == collection && symbol == s
                         then Just new_collection'
-                        else goto dfa collection s)
+                        else goto dfa collection' symbol)
         dfa' = if Set.null new_items
                 then dfa
                 else dfa { collections = collections'

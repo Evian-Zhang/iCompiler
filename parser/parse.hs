@@ -13,4 +13,5 @@ main = do
             let file_path = args !! 0
             contents <- readFile file_path
             let grammar = build_grammar contents
-            print $ symbols grammar
+                dfa = grammar_to_DFA grammar
+            print dfa
