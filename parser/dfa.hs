@@ -1,5 +1,6 @@
 module DFA
 ( LRItem (LRItem)
+, is_reducible
 , LRCollection (LRCollection)
 , DFA (DFA)
 , collections
@@ -21,23 +22,25 @@ augment_grammar grammar = Grammar { symbols = symbols'
                                   , productions = productions'
                                   }
     where
-        Symbol start_symbol_content _ = start_symbol grammar
-        start_symbol' = Symbol (start_symbol_content ++ "'") False
+        start_symbol_content = case start_symbol grammar of
+                                Nonterminal content -> content
+                                _ -> error "Unexpected error"
+        start_symbol' = Nonterminal (start_symbol_content ++ "'")
         symbols' = Set.insert start_symbol' $ symbols grammar
         productions' = (\symbol -> if symbol == start_symbol'
                                     then Set.singleton [start_symbol grammar]
                                     else productions grammar symbol)
 
-data LRItem = LRItem Symbol RHS Int deriving (Eq, Ord)
+data LRItem = LRItem Symbol RHS Int Symbol deriving (Eq, Ord)
 
 instance Show LRItem where
-    show (LRItem lhs rhs index) = show lhs ++ "->" ++ (show_rhs rhs index)
+    show (LRItem lhs rhs index symbol) = show lhs ++ "->" ++ (show_rhs rhs index) ++ "\t" ++ (show symbol)
         where
             show_rhs_list rhs = List.foldl (\str symbol -> str ++ (show symbol)) [] rhs
             show_rhs rhs index = show_rhs_list (take index rhs) ++ "." ++ (show_rhs_list $ drop index rhs)
 
 init_item :: Symbol -> RHS -> LRItem
-init_item lhs rhs = if rhs == [Symbol "ε" True]
+init_item lhs rhs = if rhs == [Epsilon]
                         then LRItem lhs [] 0
                         else LRItem lhs rhs 0
 
@@ -109,7 +112,7 @@ grammar_to_DFA grammar = dfa
     where
         grammar' = augment_grammar grammar
         start_symbol' = start_symbol grammar'
-        start_item = LRItem start_symbol' (Set.elemAt 0 $ productions grammar' start_symbol') 0
+        start_item = LRItem start_symbol' (Set.elemAt 0 $ productions grammar' start_symbol') 0 EOF
         start_collection' = LRCollection 0 $ closure_items grammar' $ Set.singleton start_item
         dfa' = DFA { collections = Set.singleton start_collection'
                    , dfa_symbols = symbols grammar'

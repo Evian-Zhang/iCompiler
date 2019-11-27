@@ -1,6 +1,7 @@
 import CFG
 import Input_Parser
 import DFA
+import Parsing_Table
 
 import System.IO
 import System.Environment
