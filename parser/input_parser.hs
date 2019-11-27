@@ -38,9 +38,17 @@ get_nonterminal_strs strs@(c:cs) = if c == "productions"
     where
         (symbols, remain) = get_nonterminal_strs cs
 
+wordsWhen :: (Char -> Bool) -> String -> [String]
+wordsWhen p s = reverse $ wordsWhen' p s [[]]
+    where
+        wordsWhen' _ [] res = res
+        wordsWhen' p (s:remain) res@(x:y) = if p s 
+            then wordsWhen' p remain ([]:res)
+            else wordsWhen' p remain ((x ++ [s]) : y)
+
 get_production_strs :: [String] -> [(String, [String])]
 get_production_strs [] = []
-get_production_strs (c:cs) = (lhs_str, rhs_strs) : (get_production_strs cs)
+get_production_strs (c:cs) = productions ++ (get_production_strs cs)
     where
         (lhs_str, rhs_str) = get_lhs_str c
             where
@@ -50,11 +58,6 @@ get_production_strs (c:cs) = (lhs_str, rhs_strs) : (get_production_strs cs)
                                         else (a : lhs_str, remain)
                     where
                         (lhs_str, remain) = get_lhs_str (b:cs)
-        rhs_strs = wordsWhen (== '.') rhs_str
-            where
-                wordsWhen p s = reverse $ wordsWhen' p s [[]]
-                    where
-                        wordsWhen' _ [] res = res
-                        wordsWhen' p (s:remain) res@(x:y) = if p s 
-                            then wordsWhen' p remain ([]:res)
-                            else wordsWhen' p remain ((x ++ [s]) : y)
+        rhs_strs = wordsWhen (== '|') rhs_str
+        rhs_groups = map (\rhs_str -> wordsWhen (== '.') rhs_str) rhs_strs
+        productions = map (\rhs_tokens -> (lhs_str, rhs_tokens)) rhs_groups

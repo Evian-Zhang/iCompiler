@@ -107,15 +107,16 @@ instance Show DFA where
 grammar_to_DFA :: Grammar -> DFA
 grammar_to_DFA grammar = dfa
     where
-        start_symbol' = start_symbol grammar
-        start_item = LRItem start_symbol' (Set.elemAt 0 $ productions grammar start_symbol') 0
-        start_collection' = LRCollection 0 $ closure_items grammar $ Set.singleton start_item
+        grammar' = augment_grammar grammar
+        start_symbol' = start_symbol grammar'
+        start_item = LRItem start_symbol' (Set.elemAt 0 $ productions grammar' start_symbol') 0
+        start_collection' = LRCollection 0 $ closure_items grammar' $ Set.singleton start_item
         dfa' = DFA { collections = Set.singleton start_collection'
-                   , dfa_symbols = symbols grammar
+                   , dfa_symbols = symbols grammar'
                    , start_collection = start_collection'
                    , goto = (\_ _ -> Nothing)
                    }
-        dfa = grammar_to_DFA' grammar [start_collection'] dfa'
+        dfa = grammar_to_DFA' grammar' [start_collection'] dfa'
 
 grammar_to_DFA' :: Grammar -> [LRCollection] -> DFA -> DFA
 grammar_to_DFA' _ [] dfa = dfa
