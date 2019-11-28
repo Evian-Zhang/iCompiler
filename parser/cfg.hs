@@ -133,7 +133,7 @@ update_first_with_nonterminal grammar symbol first =
 update_first_with_production :: Grammar-> RHS -> ([Symbol] -> Set.Set Symbol) -> Set.Set Symbol
 update_first_with_production _ [s] first = first [s]
 update_first_with_production grammar (s:ss) first = 
-    Set.union (first [s]) (if is_nullable grammar [head ss]
+    Set.union (Set.delete Epsilon $ first [s]) (if is_nullable grammar [head ss]
                             then update_first_with_production grammar ss first
                             else Set.empty)
                                     
