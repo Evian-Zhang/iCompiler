@@ -18,11 +18,12 @@ build_grammar content = grammar
         production_strs = if length contents3 > 0 && head contents3 == "productions"
                             then get_production_strs $ tail contents3
                             else error "No productions declared"
-        grammar1 = singleton_grammar $ Symbol start_symbol_str False
+        grammar1 = singleton_grammar $ Nonterminal start_symbol_str
         terminals = to_terminal_symbols terminal_strs
         nonterminals = to_nonterminal_symbols nonterminal_strs
         grammar2 = update_symbols grammar1 terminals nonterminals
-        grammar = foldl (\grammar' (lhs_str, rhs_strs) -> update_productions grammar' lhs_str rhs_strs) grammar2 production_strs
+        grammar3 = foldl (\grammar' (lhs_str, rhs_strs) -> update_productions grammar' lhs_str rhs_strs) grammar2 production_strs
+        grammar = update_first grammar3
 
 get_terminal_strs :: [String] -> ([String], [String])
 get_terminal_strs strs@(c:cs) = if c == "nonterminals"
