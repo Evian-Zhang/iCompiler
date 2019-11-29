@@ -35,21 +35,28 @@ augment_grammar grammar = grammar { symbols = symbols'
                                     then Set.singleton [start_symbol grammar]
                                     else productions grammar symbol)
 
+data LRTmpItem = LRTmpItem { _item_lhs :: Symbol
+                           , _item_rhs :: RHS
+                           , _item_dot :: Int
+                           } deriving (Eq, Ord)
+
 data LRItem = LRItem { item_lhs :: Symbol
                      , item_rhs :: RHS
                      , item_dot :: Int
                      , item_lookaheads :: Set.Set Symbol
                      }
 
+to_tmp_item :: LRItem -> LRTmpItem
+to_tmp_item item = LRTmpItem { _item_lhs = item_lhs item
+                             , _item_rhs = item_rhs item
+                             , _item_dot = item_dot item
+                             }
+
 instance Eq LRItem where
-    (==) item1 item2 = item1 == item2'
-        where
-            item2' = item2 { item_lookaheads = item_lookaheads item1 }
+    (==) item1 item2 = (to_tmp_item item1) == (to_tmp_item item2)
 
 instance Ord LRItem where
-    compare item1 item2 = compare item1 item2'
-        where
-            item2' = item2 { item_lookaheads = item_lookaheads item1 }
+    compare item1 item2 = compare (to_tmp_item item1) (to_tmp_item item2)
 
 instance Show LRItem where
     show item = (show $ item_lhs item) ++ "->" ++ (show_rhs (item_rhs item) (item_dot item)) ++ "\t" ++ (show $ Set.toList $ item_lookaheads item)
@@ -81,11 +88,10 @@ one_level_closure_item grammar item = items
         items' = if is_reducible item || Set.null rhss
                     then Set.empty
                     else Set.foldl (\items'' rhs -> 
-                        update_closure items'' $ 
-                            init_item current_symbol rhs $ 
-                                Set.foldl (\lookaheads lookahead -> Set.union lookaheads $ 
-                                    first grammar (following_symbols ++ [lookahead])) Set.empty $ item_lookaheads item)
-                                Set.empty rhss
+                        update_closure items'' $
+                            init_item current_symbol rhs $
+                                Set.foldl (\lookaheads lookahead -> Set.union lookaheads $ first grammar (following_symbols ++ [lookahead])) Set.empty $ item_lookaheads item)
+                            Set.empty rhss
             where
                 following_symbols = drop (item_dot item + 1) $ item_rhs item
                 update_closure items item = items'
@@ -153,8 +159,8 @@ grammar_to_DFA grammar = dfa
     where
         grammar' = augment_grammar grammar
         start_symbol' = start_symbol grammar'
-        ini_start_symbol = Set.elemAt 0 $ productions grammar' start_symbol'
-        start_item = init_item start_symbol' ini_start_symbol (Set.singleton EOF)
+        ini_start_symbol = start_symbol grammar
+        start_item = init_item start_symbol' [ini_start_symbol] (Set.singleton EOF)
         start_collection' = LRCollection 0 $ closure_items grammar' $ Set.singleton start_item
         dfa' = DFA { collections = Set.singleton start_collection'
                    , dfa_symbols = symbols grammar'

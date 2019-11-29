@@ -98,7 +98,7 @@ update_first :: Grammar -> Grammar
 update_first grammar = grammar { first = first' }
     where
         first1 = update_first_with_terminals $ first grammar
-        first' = update_others grammar first1
+        first2 = update_others grammar first1
             where
                 update_others grammar first1 = first'
                     where
@@ -114,6 +114,7 @@ update_first grammar = grammar { first = first' }
                                             then compare_first (Set.deleteAt 0 symbols) first1 first2
                                             else False
                         first' = if is_first_stable then first2 else update_others grammar first2
+        first' = update_first_with_list grammar first2
 
 update_first_with_terminals :: ([Symbol] -> Set.Set Symbol) -> [Symbol] -> Set.Set Symbol
 update_first_with_terminals first = 
@@ -126,8 +127,10 @@ update_first_with_terminals first =
 update_first_with_nonterminal :: Grammar -> Symbol -> ([Symbol] -> Set.Set Symbol) -> [Symbol] -> Set.Set Symbol
 update_first_with_nonterminal grammar symbol first = 
     \symbols -> case symbols of
-                    [symbol] -> Set.foldl (\symbols' rhs -> 
-                        Set.union symbols' $ update_first_with_production grammar rhs first) Set.empty $ productions grammar symbol
+                    [symbol'] -> if symbol' == symbol
+                                    then Set.foldl (\symbols' rhs -> 
+                                            Set.union symbols' $ update_first_with_production grammar rhs first) Set.empty $ productions grammar symbol
+                                    else first [symbol']
                     _ -> first symbols
 
 update_first_with_production :: Grammar-> RHS -> ([Symbol] -> Set.Set Symbol) -> Set.Set Symbol
@@ -135,5 +138,11 @@ update_first_with_production _ [s] first = first [s]
 update_first_with_production grammar (s:ss) first = 
     Set.union (Set.delete Epsilon $ first [s]) (if is_nullable grammar [head ss]
                             then update_first_with_production grammar ss first
-                            else Set.empty)
+                            else first [head ss])
                                     
+update_first_with_list :: Grammar -> ([Symbol] -> Set.Set Symbol) -> [Symbol] -> Set.Set Symbol
+update_first_with_list grammar first = first'
+    where
+        first' = \symbols -> case symbols of
+                    [] -> Set.empty
+                    _ -> update_first_with_production grammar symbols first

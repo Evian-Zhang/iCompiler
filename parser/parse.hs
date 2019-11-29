@@ -6,6 +6,8 @@ import DFA
 import System.IO
 import System.Environment
 
+import qualified Data.Set as Set
+
 main = do
     args <- getArgs
     if length args /= 1
@@ -15,4 +17,4 @@ main = do
             contents <- readFile file_path
             let grammar = build_grammar contents
                 dfa = grammar_to_DFA grammar
-            print $ collections dfa
+            print dfa
