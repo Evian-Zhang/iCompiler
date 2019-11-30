@@ -13,10 +13,17 @@ import qualified Data.List as List
 data Production = Production Symbol RHS
 
 instance Show Production where
-    show (Production lhs rhs) = (show lhs) ++ "->" ++ (List.foldl (\rhs_str symbol -> rhs_str ++ (show symbol)) "" rhs)
+    show (Production lhs rhs) = (show lhs) ++ "->" ++ (show_rhs rhs)
+        where
+            show_rhs [s] = show s
+            show_rhs (s:ss) = show s ++ "." ++ (show_rhs ss)
 
 item_to_production :: LRItem -> Production
-item_to_production item = Production (item_lhs item) (item_rhs item)
+item_to_production item = Production (item_lhs item) rhs_with_epsilon_considered
+    where
+        rhs_with_epsilon_considered = case item_rhs item of
+            [] -> [Epsilon]
+            _ -> item_rhs item
 
 data Action = Shift LRCollection | Reduce Production | Accept | Reject
 

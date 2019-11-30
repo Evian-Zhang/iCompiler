@@ -2,6 +2,7 @@
 lex
 scan
 parse
+match
 *.hi
 *.o
 *.l
