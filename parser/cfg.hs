@@ -12,6 +12,7 @@ module CFG
 , singleton_grammar
 , update_symbols
 , get_nonterminals
+, get_terminals
 , update_productions
 , is_nullable
 , update_first
@@ -73,6 +74,11 @@ get_nonterminals :: Grammar -> Set.Set Symbol
 get_nonterminals grammar = Set.filter (\symbol -> case symbol of
                                             Nonterminal _ -> True
                                             _ -> False) $ symbols grammar
+
+get_terminals :: Grammar -> Set.Set Symbol
+get_terminals grammar = Set.filter (\symbol -> case symbol of
+                                        Terminal _ -> True
+                                        _ -> False) $ symbols grammar
 
 update_productions :: Grammar -> String -> [String] -> Grammar
 update_productions grammar lhs_str rhs_strs = grammar { productions = productions' }
