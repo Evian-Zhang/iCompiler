@@ -24,7 +24,9 @@ construct_parsetree' dfa symbols collections_stack symbols_stack = node
                                     [Epsilon] -> 0
                                     _ -> List.length rhs
                     (poped_symbols, remain_symbols) = splitAt poped_count symbols_stack
-                    new_node = ParseTree lhs $ List.foldl (\rhs' symbol -> symbol : rhs') [] poped_symbols
+                    new_node = case rhs of
+                                    [Epsilon] -> ParseTree lhs [ParseTree Epsilon []]
+                                    _ -> ParseTree lhs $ List.foldl (\rhs' symbol -> symbol : rhs') [] poped_symbols
                     symbols_stack' = new_node : remain_symbols
                     remain_collections = drop poped_count collections_stack
                     current_top = head remain_collections
