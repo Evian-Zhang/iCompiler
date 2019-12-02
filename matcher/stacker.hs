@@ -29,4 +29,4 @@ construct_parsetree' dfa symbols collections_stack symbols_stack = node
                         Just index -> index
                         Nothing -> error $ show current_top ++ "\n" ++ show lhs) : remain_collections
             Accept -> head symbols_stack
-            Reject -> error $ (show $ head collections_stack) ++ "\t" ++ (show the_symbol)
+            Reject -> error "Parsing error"
