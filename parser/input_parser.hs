@@ -2,6 +2,21 @@ module Input_Parser ( build_grammar ) where
 
 import CFG
 
+import qualified Data.Set as Set
+
+augment_grammar :: Grammar -> Grammar
+augment_grammar grammar = grammar { start_symbol = start_symbol'
+                                  , productions = productions'
+                                  }
+    where
+        start_symbol_content = case start_symbol grammar of
+                                Nonterminal content -> content
+                                _ -> error "Unexpected error"
+        start_symbol' = Nonterminal (start_symbol_content ++ "'")
+        productions' = (\symbol -> if symbol == start_symbol'
+                                    then Set.singleton [start_symbol grammar]
+                                    else productions grammar symbol)
+
 build_grammar :: String -> Grammar
 build_grammar content = grammar
     where
@@ -23,7 +38,9 @@ build_grammar content = grammar
         nonterminals = to_nonterminal_symbols nonterminal_strs
         grammar2 = update_symbols grammar1 terminals nonterminals
         grammar3 = foldl (\grammar' (lhs_str, rhs_strs) -> update_productions grammar' lhs_str rhs_strs) grammar2 production_strs
-        grammar = update_first grammar3
+        grammar4 = update_nullable grammar3
+        grammar5 = update_first grammar4
+        grammar = augment_grammar grammar5
 
 get_terminal_strs :: [String] -> ([String], [String])
 get_terminal_strs strs@(c:cs) = if c == "nonterminals"

@@ -4,6 +4,7 @@ module DFA
 , item_rhs
 , item_dot
 , item_lookaheads
+, find_without_lookahead
 , is_reducible
 , LRCollection (LRCollection)
 , DFA (DFA)
@@ -20,21 +21,6 @@ import CFG
 import qualified Data.Set as Set
 import qualified Data.List as List
 
-augment_grammar :: Grammar -> Grammar
-augment_grammar grammar = grammar { symbols = symbols'
-                                  , start_symbol = start_symbol'
-                                  , productions = productions'
-                                  }
-    where
-        start_symbol_content = case start_symbol grammar of
-                                Nonterminal content -> content
-                                _ -> error "Unexpected error"
-        start_symbol' = Nonterminal (start_symbol_content ++ "'")
-        symbols' = Set.insert start_symbol' $ symbols grammar
-        productions' = (\symbol -> if symbol == start_symbol'
-                                    then Set.singleton [start_symbol grammar]
-                                    else productions grammar symbol)
-
 data LRTmpItem = LRTmpItem { _item_lhs :: Symbol
                            , _item_rhs :: RHS
                            , _item_dot :: Int
@@ -44,7 +30,7 @@ data LRItem = LRItem { item_lhs :: Symbol
                      , item_rhs :: RHS
                      , item_dot :: Int
                      , item_lookaheads :: Set.Set Symbol
-                     }
+                     } deriving (Eq, Ord)
 
 to_tmp_item :: LRItem -> LRTmpItem
 to_tmp_item item = LRTmpItem { _item_lhs = item_lhs item
@@ -52,11 +38,12 @@ to_tmp_item item = LRTmpItem { _item_lhs = item_lhs item
                              , _item_dot = item_dot item
                              }
 
-instance Eq LRItem where
-    (==) item1 item2 = (to_tmp_item item1) == (to_tmp_item item2)
-
-instance Ord LRItem where
-    compare item1 item2 = compare (to_tmp_item item1) (to_tmp_item item2)
+find_without_lookahead :: Set.Set LRItem -> LRItem -> Maybe LRItem
+find_without_lookahead items item = if Set.null target_set
+                                        then Nothing
+                                        else Just $ Set.elemAt 0 target_set
+    where
+        target_set = Set.filter (\item' -> (to_tmp_item item) == (to_tmp_item item')) items
 
 instance Show LRItem where
     show item = (show $ item_lhs item) ++ "->" ++ (show_rhs (item_rhs item) (item_dot item)) ++ "\t" ++ (show $ Set.toList $ item_lookaheads item)
@@ -66,10 +53,14 @@ instance Show LRItem where
 
 init_item :: Symbol -> RHS -> Set.Set Symbol -> LRItem
 init_item lhs rhs lookaheads = LRItem { item_lhs = lhs
-                                      , item_rhs = rhs
+                                      , item_rhs = rhs'
                                       , item_dot = 0
                                       , item_lookaheads = lookaheads
                                       }
+    where
+        rhs' = if rhs == [Epsilon]
+                then []
+                else rhs
 
 merge_item :: LRItem -> LRItem -> LRItem
 merge_item item1 item2 = item
@@ -80,39 +71,37 @@ merge_item item1 item2 = item
 is_reducible :: LRItem -> Bool
 is_reducible item = (List.length $ item_rhs item) == item_dot item
 
-one_level_closure_item :: Grammar -> LRItem -> Set.Set LRItem
-one_level_closure_item grammar item = items
+one_level_closure_item :: Grammar -> LRItem -> Set.Set LRItem -> Set.Set LRItem
+one_level_closure_item grammar item total = items
     where
         current_symbol = (item_rhs item) !! (item_dot item)
         rhss = productions grammar current_symbol
         items' = if is_reducible item || Set.null rhss
-                    then Set.empty
+                    then total
                     else Set.foldl (\items'' rhs -> 
                         update_closure items'' $
                             init_item current_symbol rhs $
                                 Set.foldl (\lookaheads lookahead -> Set.union lookaheads $ first grammar (following_symbols ++ [lookahead])) Set.empty $ item_lookaheads item)
-                            Set.empty rhss
+                            total rhss
             where
                 following_symbols = drop (item_dot item + 1) $ item_rhs item
                 update_closure items item = items'
                     where
-                        index' = Set.lookupIndex item items
-                        items' = case index' of
-                            Just index'' -> Set.insert (merge_item item' item) items
-                                where
-                                    item' = Set.elemAt index'' items
+                        item'' = find_without_lookahead items item
+                        items' = case item'' of
+                            Just item1 -> Set.insert (merge_item item1 item) $ Set.delete item1 items
                             Nothing -> Set.insert item items
         items = Set.insert item items'
 
 closure_items :: Grammar -> Set.Set LRItem -> Set.Set LRItem
 closure_items grammar items = items'
     where
-        new_closure = Set.foldl (\items'' item -> Set.union items'' $ one_level_closure_item grammar item) Set.empty items
+        new_closure = Set.foldl (\items'' item -> one_level_closure_item grammar item items'') items items
         added_items = new_closure Set.\\ items
-        items' = if Set.null items
-                    then Set.empty
+        items' = if Set.null added_items
+                    then items
                     else 
-                        Set.union new_closure $ closure_items grammar added_items
+                        closure_items grammar new_closure
 
 goto_items :: Grammar -> Set.Set LRItem -> Symbol -> Set.Set LRItem
 goto_items grammar items s = items'
@@ -157,17 +146,16 @@ instance Show DFA where
 grammar_to_DFA :: Grammar -> DFA
 grammar_to_DFA grammar = dfa
     where
-        grammar' = augment_grammar grammar
-        start_symbol' = start_symbol grammar'
-        ini_start_symbol = start_symbol grammar
-        start_item = init_item start_symbol' [ini_start_symbol] (Set.singleton EOF)
-        start_collection' = LRCollection 0 $ closure_items grammar' $ Set.singleton start_item
+        start_symbol' = start_symbol grammar
+        ini_start_symbol = Set.elemAt 0 $ productions grammar start_symbol'
+        start_item = init_item start_symbol' ini_start_symbol (Set.singleton EOF)
+        start_collection' = LRCollection 0 $ closure_items grammar $ Set.singleton start_item
         dfa' = DFA { collections = Set.singleton start_collection'
-                   , dfa_symbols = symbols grammar'
+                   , dfa_symbols = symbols grammar
                    , start_collection = start_collection'
                    , goto = (\_ _ -> Nothing)
                    }
-        dfa = grammar_to_DFA' grammar' [start_collection'] dfa'
+        dfa = grammar_to_DFA' grammar [start_collection'] dfa'
 
 grammar_to_DFA' :: Grammar -> [LRCollection] -> DFA -> DFA
 grammar_to_DFA' _ [] dfa = dfa

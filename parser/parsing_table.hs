@@ -39,7 +39,7 @@ action grammar dfa collection@(LRCollection _ items) symbol = action'
                             , item_dot = 1
                             , item_lookaheads = Set.singleton EOF
                             }
-        action' = if Set.member start_item items && symbol == EOF
+        action' = if find_without_lookahead items start_item /= Nothing && symbol == EOF
                     then
                         case shift_collection of
                             Just _ -> error "Shift-reduce conflict"

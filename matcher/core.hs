@@ -45,4 +45,4 @@ data ParseTree = ParseTree Symbol [ParseTree]
 instance Show ParseTree where
     show (ParseTree lhs rhs) = show lhs ++ (List.concatMap (\node -> show' node 0) rhs)
         where
-            show' (ParseTree lhs rhs) indent = "\n" ++ (List.concat $ List.replicate indent "  ") ++ "|--" ++ (show lhs) ++ (List.concatMap (\node -> show' node (indent + 1)) rhs)
+            show' (ParseTree lhs rhs) indent = "\n" ++ (List.concat $ List.replicate indent "   ") ++ "|--" ++ (show lhs) ++ (List.concatMap (\node -> show' node (indent + 1)) rhs)

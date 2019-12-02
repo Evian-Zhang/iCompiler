@@ -27,6 +27,6 @@ construct_parsetree' dfa symbols collections_stack symbols_stack = node
                     current_top = head remain_collections
                     collections_stack' = (case goto dfa current_top lhs of
                         Just index -> index
-                        Nothing -> error "Unexpected error") : remain_collections
+                        Nothing -> error $ show current_top ++ "\n" ++ show lhs) : remain_collections
             Accept -> head symbols_stack
             Reject -> error $ (show $ head collections_stack) ++ "\t" ++ (show the_symbol)
