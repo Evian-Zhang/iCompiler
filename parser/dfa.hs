@@ -38,6 +38,7 @@ to_tmp_item item = LRTmpItem { _item_lhs = item_lhs item
                              , _item_dot = item_dot item
                              }
 
+-- find the given item ignoring the item_lookaheads field
 find_without_lookahead :: Set.Set LRItem -> LRItem -> Maybe LRItem
 find_without_lookahead items item = if Set.null target_set
                                         then Nothing
@@ -62,6 +63,7 @@ init_item lhs rhs lookaheads = LRItem { item_lhs = lhs
                 then []
                 else rhs
 
+-- merge the two items's lookaheads field
 merge_item :: LRItem -> LRItem -> LRItem
 merge_item item1 item2 = item
     where
@@ -71,6 +73,8 @@ merge_item item1 item2 = item
 is_reducible :: LRItem -> Bool
 is_reducible item = (List.length $ item_rhs item) == item_dot item
 
+-- one_level_closure_item grammar item total
+-- @brief find the direct closure of given item and merge it into the total
 one_level_closure_item :: Grammar -> LRItem -> Set.Set LRItem -> Set.Set LRItem
 one_level_closure_item grammar item total = items
     where
@@ -157,6 +161,8 @@ grammar_to_DFA grammar = dfa
                    }
         dfa = grammar_to_DFA' grammar [start_collection'] dfa'
 
+-- grammar_to_DFA' grammar collections dfa
+-- @brief collections are constantly changing, storing the collections that haven't been closured
 grammar_to_DFA' :: Grammar -> [LRCollection] -> DFA -> DFA
 grammar_to_DFA' _ [] dfa = dfa
 grammar_to_DFA' grammar (collection:remain) dfa = grammar_to_DFA' grammar remain' dfa'
@@ -167,6 +173,8 @@ grammar_to_DFA' grammar (collection:remain) dfa = grammar_to_DFA' grammar remain
         added_collections'' = List.sortOn (\(LRCollection index _) -> index) added_collections'
         remain' = remain ++ added_collections''
 
+-- grammar_to_DFA'' grammar collection symbols dfa
+-- @brief traversing the symbols list to closure and goto the given collection
 grammar_to_DFA'' :: Grammar -> LRCollection -> [Symbol] -> DFA -> DFA
 grammar_to_DFA'' _ _ [] dfa = dfa
 grammar_to_DFA'' grammar collection@(LRCollection _ items) (s:remain) dfa = grammar_to_DFA'' grammar collection remain dfa'

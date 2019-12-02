@@ -4,6 +4,7 @@ import CFG
 
 import qualified Data.Set as Set
 
+-- augment the grammar with another start symbol to make sure the start_symbol never in the rhs
 augment_grammar :: Grammar -> Grammar
 augment_grammar grammar = grammar { start_symbol = start_symbol'
                                   , productions = productions'

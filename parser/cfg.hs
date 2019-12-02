@@ -37,6 +37,7 @@ to_terminal_symbols strs = List.foldl (\symbols str -> Set.insert (Terminal str)
 to_nonterminal_symbols :: [String] -> Set.Set Symbol
 to_nonterminal_symbols strs = List.foldl (\symbols str -> Set.insert (Nonterminal str) symbols) Set.empty strs
 
+-- @brief if the input is `Terminal` or `Epsilon` or `EOF`, the output is True, else is Flase
 is_terminal :: Symbol -> Bool
 is_terminal (Nonterminal _) = False
 is_terminal _ = True
@@ -50,6 +51,8 @@ data Grammar = Grammar { symbols :: Set.Set Symbol
                        , is_nullable :: [Symbol] -> Bool
                        }
 
+-- singleton_grammar start_symbol
+-- @brief use the given start_symbol as start_symbol to generate a grammar
 singleton_grammar :: Symbol -> Grammar
 singleton_grammar start_symbol' = Grammar { symbols = Set.empty
                                           , start_symbol = start_symbol'
@@ -64,6 +67,8 @@ singleton_grammar start_symbol' = Grammar { symbols = Set.empty
 update_symbols :: Grammar -> Set.Set Symbol -> Set.Set Symbol -> Grammar
 update_symbols grammar terminals nonterminals = grammar { symbols = Set.union terminals nonterminals }
 
+-- get_symbol grammar str
+-- @brief if there is a symbol in ths given grammar whose content is str, then return Just the symbol, else return Nothing
 get_symbol :: Grammar -> String -> Maybe Symbol
 get_symbol grammar str =
     if str == "ε"
