@@ -20,13 +20,16 @@ construct_parsetree' dfa symbols collections_stack symbols_stack = node
             Shift next_collection -> construct_parsetree' dfa (tail symbols) (next_collection : collections_stack) ((ParseTree the_symbol []) : symbols_stack)
             Reduce (Production lhs rhs) -> construct_parsetree' dfa symbols collections_stack' symbols_stack'
                 where
-                    (poped_symbols, remain_symbols) = splitAt (List.length rhs) symbols_stack
+                    poped_count = case rhs of
+                                    [Epsilon] -> 0
+                                    _ -> List.length rhs
+                    (poped_symbols, remain_symbols) = splitAt poped_count symbols_stack
                     new_node = ParseTree lhs $ List.foldl (\rhs' symbol -> symbol : rhs') [] poped_symbols
                     symbols_stack' = new_node : remain_symbols
-                    remain_collections = drop (List.length rhs) collections_stack
+                    remain_collections = drop poped_count collections_stack
                     current_top = head remain_collections
                     collections_stack' = (case goto dfa current_top lhs of
                         Just index -> index
-                        Nothing -> error $ show current_top ++ "\n" ++ show lhs) : remain_collections
+                        Nothing -> error "Parsing error") : remain_collections
             Accept -> head symbols_stack
             Reject -> error "Parsing error"
