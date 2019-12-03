@@ -7,6 +7,7 @@ module DFA
 , find_without_lookahead
 , is_reducible
 , LRCollection (LRCollection)
+, show_items
 , DFA (DFA)
 , collections
 , dfa_symbols
@@ -115,6 +116,9 @@ goto_items grammar items s = items'
         items' = closure_items grammar shift_items
 
 data LRCollection = LRCollection Int (Set.Set LRItem) deriving (Show)
+
+show_items :: LRCollection -> String
+show_items (LRCollection _ items) = Set.foldl (\str item -> str ++ (show item) ++ "\n") "" items
 
 instance Eq LRCollection where
     (==) (LRCollection _ items1) (LRCollection _ items2) = items1 == items2

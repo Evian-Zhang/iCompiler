@@ -1,5 +1,7 @@
 module String_Matcher
-( match_string ) where
+( match_string
+, MatchResult (Success, Fail)
+) where
 
 import Core
 
@@ -8,12 +10,14 @@ data Token = Token String ID
 instance Show Token where
     show (Token str id) = "Token \"" ++ str ++ "\" " ++ (show id)
 
-match_string :: String -> FA -> [Token] -> Maybe [Token]
+data MatchResult = Success [Token] | Fail String
+
+match_string :: String -> FA -> [Token] -> MatchResult
 match_string string fa tokens = case maybe_token of
         Just token@(Token matched_string _) -> match_string (drop (length matched_string) string) fa (tokens ++ [token])
         Nothing -> if length string == 0
-                    then Just tokens
-                    else Nothing
+                    then Success tokens
+                    else Fail string
     where
         (_, maybe_token) = match_one_token string fa (start_state fa) ("", Nothing)
 

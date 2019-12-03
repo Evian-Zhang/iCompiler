@@ -19,6 +19,6 @@ main = do
             let fa = update_ids (edges_to_fa edges_str) end_states_str
                 tokens = match_string string_str fa []
                 just_tokens = case tokens of
-                                Just tokens -> tokens
-                                Nothing -> error "Match error"
+                                Success tokens -> tokens
+                                Fail str -> error ("Match error since: " ++ (take 10 str))
             mapM_ print just_tokens

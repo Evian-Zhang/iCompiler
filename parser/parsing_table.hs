@@ -42,18 +42,18 @@ action grammar dfa collection@(LRCollection _ items) symbol = action'
         action' = if find_without_lookahead items start_item /= Nothing && symbol == EOF
                     then
                         case shift_collection of
-                            Just _ -> error "Shift-reduce conflict"
+                            Just x -> error $ "Shift-reduce conflict between LR(1) items:\n" ++ (show start_item) ++ "\n" ++ (show_items x)
                             Nothing -> Accept
                     else
                         case shift_collection of
                             Just next_collection -> 
                                 if not $ Set.null reducible_items
-                                    then error "Shift-reduce conflict"
+                                    then error $ "Shift-reduce conflict between LR(1) items:\n" ++ (show_items $ LRCollection 0 reducible_items) ++ (show_items next_collection)
                                     else Shift next_collection
                             Nothing ->
                                 if not $ Set.null reducible_items
                                     then 
                                         if Set.size reducible_items > 1
-                                            then error "Reduce-reduce conflict"
+                                            then error $ "Reduce-reduce conflict between LR(1) items:\n" ++ (show_items $ LRCollection 0 reducible_items)
                                             else Reduce $ item_to_production $ Set.elemAt 0 reducible_items
                                     else Reject

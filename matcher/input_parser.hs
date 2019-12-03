@@ -22,6 +22,7 @@ to_symbol "ε" = Epsilon
 to_symbol "$" = EOF
 to_symbol symbol_str = Normal symbol_str
 
+-- from action and goto to construct DFA
 parse_action_goto :: String -> String -> DFA
 parse_action_goto action_str goto_str = dfa
     where
@@ -59,6 +60,7 @@ to_action (c:cs) = case c of
     'a' -> Accept
     _ -> Reject
 
+-- from one row of action table to update action of DFA
 update_action :: DFA -> [Symbol] -> String -> DFA
 update_action dfa terminals action_str = update_action' dfa terminals $ wordsWhen (== ',') action_str
     where
@@ -79,6 +81,7 @@ to_goto :: String -> Maybe Int
 to_goto [] = Nothing
 to_goto str = Just $ read str
 
+-- from one row of goto table to update goto of DFA
 update_goto :: DFA -> [Symbol] -> String -> DFA
 update_goto dfa nonterminals goto_str = update_goto' dfa nonterminals $ wordsWhen (== ',') goto_str
     where

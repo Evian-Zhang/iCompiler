@@ -61,7 +61,7 @@ tokenize_regular_expression (c:cs) = case c of
                     '+' -> REChar (CommonChar '+')
                     '(' -> REChar (CommonChar '(')
                     ')' -> REChar (CommonChar ')')
-                    _ -> error "Invalid escape character") : (tokenize_regular_expression $ tail cs)
+                    _ -> error ("Invalid escape character: \\" ++ head cs)) : (tokenize_regular_expression $ tail cs)
     _ -> tokenize_regular_char c : tokenize_regular_expression cs
 
 priority :: REToken -> Int
