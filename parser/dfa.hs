@@ -74,6 +74,14 @@ merge_item item1 item2 = item
 is_reducible :: LRItem -> Bool
 is_reducible item = (List.length $ item_rhs item) == item_dot item
 
+update_closure :: Set.Set LRItem -> LRItem -> Set.Set LRItem
+update_closure items item = items'
+    where
+        item' = find_without_lookahead items item
+        items' = case item' of
+            Just item1 -> Set.insert (merge_item item1 item) $ Set.delete item1 items
+            Nothing -> Set.insert item items
+
 -- one_level_closure_item grammar item total
 -- @brief find the direct closure of given item and merge it into the total
 one_level_closure_item :: Grammar -> LRItem -> Set.Set LRItem -> Set.Set LRItem
@@ -90,23 +98,15 @@ one_level_closure_item grammar item total = items
                             total rhss
             where
                 following_symbols = drop (item_dot item + 1) $ item_rhs item
-                update_closure items item = items'
-                    where
-                        item'' = find_without_lookahead items item
-                        items' = case item'' of
-                            Just item1 -> Set.insert (merge_item item1 item) $ Set.delete item1 items
-                            Nothing -> Set.insert item items
-        items = Set.insert item items'
+        items = update_closure items' item
 
 closure_items :: Grammar -> Set.Set LRItem -> Set.Set LRItem
 closure_items grammar items = items'
     where
         new_closure = Set.foldl (\items'' item -> one_level_closure_item grammar item items'') items items
-        added_items = new_closure Set.\\ items
-        items' = if Set.null added_items
+        items' = if new_closure == items
                     then items
-                    else 
-                        closure_items grammar new_closure
+                    else closure_items grammar new_closure
 
 goto_items :: Grammar -> Set.Set LRItem -> Symbol -> Set.Set LRItem
 goto_items grammar items s = items'
